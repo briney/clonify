@@ -1,0 +1,24 @@
+Compiling
+=========
+
+Test platform: Linux, with g++ 4.8.2.
+
+Running make will create an executable named "cluster".
+
+
+Usage
+=====
+
+usage: ./cluster [options...] input.json output.txt
+
+Options:
+  --min-center-size=INTEGER:  set the minimum center size to INTEGER.
+                              Controls the speed-vs-accuracy tradeoff.
+                              Reasonable values range from 10 to N/10000.
+                              (e.g. 10 to 100 when processing 1M antibodies)
+                              Lower values are generally more accurate.
+                              Higher values are generally faster, but values
+                              that are too high run extremely slowly.
+  --min-center-size=disabled: disable megaclustering.
+                              Warning: very slow and memory hungry!
+                              Don't use with large datasets.
