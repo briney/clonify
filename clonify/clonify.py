@@ -39,12 +39,13 @@ import time
 import traceback
 import urllib
 
-from abtools import mongodb, progbar
+from abtools import mongodb
 from abtools.queue.celery import celery
+from abtools.utils import progbar
 
-from clonify.utils import cluster
-from clonify.utils.cluster import Cluster
-from clonify.utils.database import Database
+from utils import cluster
+from utils.cluster import Cluster
+from utils.database import Database
 
 
 

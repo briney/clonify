@@ -1,4 +1,4 @@
 include README.md
 include docs/*.txt
-include vaxtools/bin/*
-include vaxtools/utils/*
+include clonify/bin/*
+include clonify/utils/*
