@@ -83,6 +83,8 @@ def parse_args():
     parser.add_argument('-t', '--temp', dest='temp', default=None,
                         help="The directory in which temp files will be stored. \
                         If the directory doesn't exist, it will be created. Required.")
+    parser.add_argument('-l', '--log', dest='logfile', required=True,
+                        help="Path to the log file. Required.")
     parser.add_argument('--non-redundant', default=False,
                         help="Collapses identical sequences prior to running Clonify. \
                         Stores redundant sequence info so that the complete redundant Mongo database will be \
@@ -109,12 +111,12 @@ class Args(object):
     def __init__(self, db=None, collection=None,
         collection_prefix=None, collection_prefix_split=None, collection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
-        output='', temp=None, non_redundant=False, clustering_threshold=1.0,
+        output='', temp=None, log=None, non_redundant=False, clustering_threshold=1.0,
         distance_cutoff=0.35, update=True, debug=False):
         super(Args, self).__init__()
-        if any([db is None, temp is None]):
+        if any([db is None, temp is None, logfile is None]):
             print('ERROR: the following options are required:')
-            print('--db, --temp')
+            print('--db, --temp, --log')
             sys.exit(1)
         self.db = db
         self.collection = collection
@@ -129,6 +131,7 @@ class Args(object):
         self.password = password
         self.output = output
         self.temp = temp
+        self.logfile = log
         self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
         self.distance_cutoff = float(distance_cutoff)
