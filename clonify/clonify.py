@@ -39,7 +39,7 @@ import time
 import traceback
 import urllib
 
-from abtools import mongodb
+from abtools import log, mongodb
 from abtools.queue.celery import celery
 from abtools.utils import progbar
 
