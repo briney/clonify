@@ -428,8 +428,10 @@ def get_mr_seqs(seq_ids, sql):
 
 def clonify(json_files, mr_db, json_db, args):
     if args.celery:
+        logger.debug('Running map jobs via Celery...')
         cluster_files = run_map_jobs_via_celery(json_files, json_db, args.debug)
     else:
+        logger.debug('Running map jobs via multiprocessing...')
         cluster_files = run_map_jobs_via_multiprocessing(json_files, json_db, args.debug)
     return run_reduce_jobs_via_multiprocessing(cluster_files, mr_db, args)
 
@@ -438,7 +440,9 @@ def run_map_jobs_via_multiprocessing(json_files, json_db, debug):
     p = mp.Pool(maxtasksperchild=50)
     async_results = []
     for j in json_files:
-        async_results.append([j, p.apply_async(clonify_map, (j, json_db, debug))])
+        logger.debug(j)
+        logger.debug
+        async_results.append([j, p.apply_async(clonify_map, (j, json_db.name, json_db.dir, debug))])
     monitor_mp_jobs([a[1] for a in async_results])
     results = []
     for a in async_results:
@@ -480,7 +484,7 @@ def monitor_mp_jobs(results):
 def run_map_jobs_via_celery(json_files, json_db, debug):
     async_results = []
     for f in files:
-        async_results.append((f, clonify_map.delay(j, json_db, debug)))
+        async_results.append((f, clonify_map.delay(j, json_db.name, json_db.dir, debug)))
     succeeded, failed = monitor_celery_jobs([ar[1] for ar in async_results])
     failed_files = [ar[0] for ar in async_results if ar[1].failed()]
     # failed_files = [f for i, f in enumerate(files) if async_results[i].failed()]
@@ -503,7 +507,7 @@ def monitor_celery_jobs(results):
 
 
 @celery.task
-def clonify_map(json_file, json_db, debug=False):
+def clonify_map(json_file, json_db_name, json_db_dir, debug=False):
     '''
     Runs clonify on the sequences contained in a JSON file.
 
@@ -519,6 +523,7 @@ def clonify_map(json_file, json_db, debug=False):
     unless debug == True.
     '''
 
+    json_db = Database(json_db_name, json_db_dir)
     seq_ids = json_db.find(json_file, unpickle=True)
     cluster_file = json_file + '_cluster'
 
@@ -536,6 +541,8 @@ def clonify_map(json_file, json_db, debug=False):
     clusters = ['\t'.join(z) for z in zip(seq_ids, cluster_names)]
     seq_cluster_file = json_file + '_seq-cluster'
     open(seq_cluster_file, 'w').write('\n'.join(clusters))
+    # clean up
+    json_db.close()
     if not debug:
         os.unlink(json_file)
         os.unlink(cluster_file)

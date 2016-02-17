@@ -32,6 +32,7 @@ class Database(object):
     def __init__(self, name, direc):
         super(Database, self).__init__()
         self.name = name
+        self.dir = direc
         self.path = os.path.join(direc, name)
         self.table_name = 'seqs'
         self.structure = [('key', 'text'), ('value', 'text')]
@@ -68,6 +69,10 @@ class Database(object):
             self._insert_cmd = 'INSERT INTO {} VALUES ({})'.format(self.table_name,
                 ','.join(['?'] * len(self.structure)))
         return self._insert_cmd
+
+
+    def close(self):
+        self.connection.close()
 
 
     def create_table(self):

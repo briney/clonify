@@ -98,7 +98,7 @@ class Cluster(object):
                                           junc_aa=s['junc_aa'],
                                           mut_string=mut_string,
                                           mut_num=s['var_muts_nt']['num']))
-        json_string = '[\n  ' + ', \n  '.join(jsons) + '\n]'
+        json_string = '[\n  ' + ', \n  '.join(jsons) + '\n] '
         if as_file:
             temp_dir = temp_dir if temp_dir is not None else '/tmp'
             jfile = tempfile.NamedTemporaryFile(dir=temp_dir, delete=False)
