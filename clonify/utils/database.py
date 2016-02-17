@@ -51,26 +51,27 @@ class Database(object):
     @property
     def cursor(self):
         if self._cursor is None:
-            self._cursor = self.conn.cursor()
+            self._cursor = self.connection.cursor()
         return self._cursor
 
     @property
     def create_table_cmd(self):
-        if self._create_cmd is None:
-            field_string = ', '.join([' '.join(s) for s in structure])
-            self._create_cmd = 'CREATE TABLE {} {}'.format(self.table_name,
-                self.structure)
-        return self._create_cmd
+        if self._create_table_cmd is None:
+            field_string = ', '.join([' '.join(s) for s in self.structure])
+            self._create_table_cmd = 'CREATE TABLE {} ({})'.format(self.table_name,
+                field_string)
+        return self._create_table_cmd
 
     @property
     def insert_cmd(self):
         if self._insert_cmd is None:
             self._insert_cmd = 'INSERT INTO {} VALUES ({})'.format(self.table_name,
-                ','.join(['?'] * len(structure)))
+                ','.join(['?'] * len(self.structure)))
         return self._insert_cmd
 
 
     def create_table(self):
+        self.cursor.execute('DROP TABLE IF EXISTS {}'.format(self.table_name))
         self.cursor.execute(self.create_table_cmd)
 
 
@@ -82,7 +83,7 @@ class Database(object):
           value - an iterable (list or tuple) containing a single key/value pair
         '''
         if len(value) != len(self.structure):
-            err = 'Mismatch between the supplied values:\n{}\n'.format(values)
+            err = 'Mismatch between the supplied value:\n{}\n'.format(value)
             err += 'and the structure of the table:\n{}'.format(self.structure)
             raise RuntimeError(err)
         self.cursor.execute(self.insert_cmd, value)

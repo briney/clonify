@@ -85,16 +85,16 @@ class Cluster(object):
     def pretty_json(sequences, as_file=False, temp_dir=None):
         jsons = []
         for s in sequences:
-            mut_list = [BASE_MUT.format(loc=m['loc'], mut=m['mut']) for m in s['var_muts_nt']]
+            mut_list = [BASE_MUT.format(loc=m['loc'], mut=m['mut']) for m in s['var_muts_nt']['muts']]
             mut_string = ', \n'.join(mut_list)
-            jsons.append(BASE_JSON.format(v_all=s['v_gene']['all'],
-                                          v_gene=s['v_gene']['gene'],
+            jsons.append(BASE_JSON.format(v_all=s['v_gene']['full'].split('*')[-1],
+                                          v_gene='-'.join(s['v_gene']['full'].split('*')[0].split('-')[1:]),
                                           v_full=s['v_gene']['full'],
-                                          v_fam=s['v_gene']['fam'],
+                                          v_fam=s['v_gene']['full'].split('-')[0].replace('IGHV', ''),
                                           seq_id=s['seq_id'],
-                                          j_all=s['j_gene']['all'],
+                                          j_all=s['j_gene']['full'].split('*')[-1],
                                           j_full=s['j_gene']['full'],
-                                          j_gene=s['j_gene']['gene'],
+                                          j_gene=s['j_gene']['full'].split('*')[0].replace('IGHJ', ''),
                                           junc_aa=s['junc_aa'],
                                           mut_string=mut_string,
                                           mut_num=s['var_muts_nt']['num']))
@@ -126,28 +126,28 @@ def get_clusters_from_file(cluster_file, mr_db=None):
     return [Cluster(seq_ids=v, mr_db=mr_db) for v in clusters.values()]
 
 
-BASE_JSON = '''  {
-    "v_gene": {
+BASE_JSON = '''  {{
+    "v_gene": {{
       "all": "{v_all}", 
       "gene": "{v_gene}", 
       "full": "{v_full}", 
       "fam": "{v_fam}"
-    }, 
+    }}, 
     "seq_id": "{seq_id}", 
-    "j_gene": {
+    "j_gene": {{
       "all": "{j_all}", 
       "full": "{j_full}", 
       "gene": "{j_gene}"
-    }, 
+    }}, 
     "junc_aa": "{junc_aa}", 
-    "var_muts_nt": {
+    "var_muts_nt": {{
       "muts": [\n{mut_string}\n      ],
       "num": {mut_num}
-    }
-  }'''
+    }}
+  }}'''
 
 
-BASE_MUT = '''        {
+BASE_MUT = '''        {{
           "loc": "{loc}", 
           "mut": "{mut}"
-        }'''
+        }}'''

@@ -26,11 +26,11 @@
 from __future__ import print_function, unicode_literals
 
 import warnings
+warnings.filterwarnings("ignore")
 
 from clonify import clonify
 
 
 if __name__ == '__main__':
-    warnings.filterwarnings("ignore")
     args = clonify.parse_args()
     clonify.run_standalone(args)

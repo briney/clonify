@@ -29,6 +29,7 @@ import celery
 from collections import OrderedDict
 import cPickle as pickle
 import json
+import math
 import multiprocessing as mp
 import os
 import sqlite3
@@ -99,6 +100,15 @@ def parse_args():
     parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.26, type=float,
                         help="The cutoff adjusted edit distance (aED) for segregating sequences into clonal families. \
                         Defaults to 0.35.")
+    parser.add_argument('-C', '--celery', dest="celery", default=False, action='store_true',
+                        help="Use if performing computation on a Celery cluster. \
+                        If set, input files will be split into many subfiles and passed \
+                        to a Celery queue. If not set, input files will still be split, but \
+                        will be distributed to local processors using multiprocessing.")
+    parser.add_argument('-w', '--num-map-workers', dest='num_map_workers', type=int, default=None,
+                        help='The number of map process that will be spawned. Default is the total \
+                        number of available cores, whether on a local machine using multiprocessing \
+                        or on a Celery cluster.')
     parser.add_argument('-n', '--no_update', dest='update', action='store_false', default=True,
                         help="Use to skip updating the MongoDB database with clonality info.")
     parser.add_argument('-D', '--debug', dest='debug', action='store_true', default=False,
@@ -112,7 +122,7 @@ class Args(object):
         collection_prefix=None, collection_prefix_split=None, collection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, log=None, non_redundant=False, clustering_threshold=1.0,
-        distance_cutoff=0.35, update=True, debug=False):
+        distance_cutoff=0.35, celery=False, update=True, debug=False):
         super(Args, self).__init__()
         if any([db is None, temp is None, logfile is None]):
             print('ERROR: the following options are required:')
@@ -135,6 +145,7 @@ class Args(object):
         self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
         self.distance_cutoff = float(distance_cutoff)
+        self.celery = celery
         self.update = update
         self.debug = debug
 
@@ -146,7 +157,7 @@ class Args(object):
 ################################
 
 
-def get_collection_groups():
+def get_collection_groups(args):
     if args.collection:
         if os.path.isfile(args.collection):
             colls = []
@@ -280,14 +291,14 @@ def get_sequences(collection_group, args):
         nr_db = nr.make_nr_seq_db(args)
         for collection in collection_group:
             print_collection_info(collection)
-            coll_seqs = query(collection)
+            coll_seqs = query(collection, args)
             nr_coll_seqs = nr.make_nr(coll_seqs, nr_db, args)
             seqs += nr_coll_seqs
             print_query_info(coll_seqs, nr=nr_coll_seqs)
     else:
         for collection in collection_group:
             print_collection_info(collection)
-            coll_seqs = query(collection)
+            coll_seqs = query(collection, args)
             seqs += coll_seqs
             print_query_info(coll_seqs)
     return seqs
@@ -319,23 +330,27 @@ def build_sqlite_db(sequences):
     return c
 
 
-def build_json_db(seq_ids, json_files):
+def build_json_db(seq_ids, json_files, args):
+    logger.info('')
     logger.info('Building a SQLite database of JSON files...')
-    jsondb = Database('json_db', args.temp_dir)
+    jsondb = Database('json_db', args.temp)
     data = [(j, pickle.dumps(s)) for j, s in zip(json_files, seq_ids)]
     jsondb.insert_many(data)
+    logger.info('Indexing...')
     jsondb.index()
     return jsondb
 
 
-def build_mr_db(sequences):
+def build_mr_db(sequences, args):
+    logger.info('')
     logger.info('Building a SQLite database of sequences for map-reduce lookup...')
     # hackety hackerson to pickle the JSON data into a SQLite db, but
     # since the db is just for rapid lookup of the JSON data by seq_id,
     # I'm OK with it.
-    mrdb = Database('mr_db', args.temp_dir)
+    mrdb = Database('mr_db', args.temp)
     seqs = [(s['seq_id'], pickle.dumps(s, protocol=0)) for s in sequences]
     mrdb.insert_many(seqs)
+    logger.info('Indexing...')
     mrdb.index()
     return mrdb
 
@@ -423,7 +438,7 @@ def run_map_jobs_via_multiprocessing(json_files, json_db, debug):
     p = mp.Pool(maxtasksperchild=50)
     async_results = []
     for j in json_files:
-        async_results.append(p.apply_async(clonify_map, (j, json_db, debug)))
+        async_results.append([j, p.apply_async(clonify_map, (j, json_db, debug))])
     monitor_mp_jobs([a[1] for a in async_results])
     results = []
     for a in async_results:
@@ -431,7 +446,7 @@ def run_map_jobs_via_multiprocessing(json_files, json_db, debug):
             results.append(a[1].get())
         except:
             logger.debug('FILE-LEVEL EXCEPTION: {}'.format(a[0]))
-            logging.debug(''.join(traceback.format_exc()))
+            logger.debug(''.join(traceback.format_exc()))
     p.close()
     p.join()
     return results
@@ -705,7 +720,7 @@ def update_progress(finished, jobs, log, failed=None):
 
 
 
-def print_start_info(coll_groups):
+def print_start_info(coll_groups, args):
     # if args.collection:
     #     if args.collection in get_collections():
     #         print('\nFound the requested collection: {}'.format(args.collection))
@@ -822,13 +837,13 @@ def get_logfile(args):
 def main(args):
     global db
     db = mongodb.get_db(args.db, args.ip, args.port, args.user, args.password)
-    collection_groups = get_collection_groups()
-    print_start_info(collection_groups)
+    collection_groups = get_collection_groups(args)
+    print_start_info(collection_groups, args)
 
     for i, collection_group in enumerate(collection_groups):
         print_collection_group_info(collection_group, i)
         seqs = get_sequences(collection_group, args)
-        mr_db = build_mr_db(seqs)
+        mr_db = build_mr_db(seqs, args)
         # seqs = []
         # json_file = os.path.join(args.temp, '{}_{}.json'.format(args.db, i))
         # if args.non_redundant:
@@ -851,27 +866,32 @@ def main(args):
 
         # Get the number of cores -- if multiprocessing, just mp.cpu_count();
         # if Celery, need to get the number of worker processes
-        if args.celery:
+        if args.num_map_workers is not None:
+            cores = args.num_map_workers
+        elif args.celery:
             app = celery.Celery()
             app.config_from_object('abtools.celeryconfig')
             stats = app.control.inspect().stats()
             cores = sum([v['pool']["max-concurrency"] for v in stats.values()])
         else:
             cores = mp.cpu_count()
+        logger.debug('CORES: {}'.format(cores))
 
         # Divide the input sequences into JSON subfiles
+        chunksize = int(math.ceil(float(len(seqs)) / cores))
+        logger.debug('CHUNKSIZE: {}'.format(chunksize))
         json_files = []
         seq_ids = []
-        for seq_chunk in chunker(seqs, cores):
+        for seq_chunk in chunker(seqs, chunksize):
             seq_ids.append([s['seq_id'] for s in seq_chunk])
             json_files.append(Cluster.pretty_json(seq_chunk,
                 as_file=True,
                 temp_dir=args.temp))
-        json_db = build_json_db(seq_ids, json_files)
+        json_db = build_json_db(seq_ids, json_files, args)
 
         # Run clonify jobs via multiprocessing or Celery
         # Should return a list of Cluster objects for each subfile
-        clusters = clonify(json_files, mr_db, json_lookup, args)
+        clusters = clonify(json_files, mr_db, json_db, args)
 
 
 
@@ -900,7 +920,7 @@ def main(args):
 def run_standalone(args):
     global logger
     logfile = get_logfile(args)
-    log.setup_logging(logfile)
+    log.setup_logging(logfile, debug=args.debug)
     logger = log.get_logger('clonify')
     main(args)
 
@@ -915,6 +935,6 @@ def run(**kwargs):
 if __name__ == '__main__':
     args = parse_args()
     logfile = get_logfile(args)
-    log.setup_logging(logfile)
+    log.setup_logging(logfile, debug=args.debug)
     logger = log.get_logger('clonify')
     main(args)
