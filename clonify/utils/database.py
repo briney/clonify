@@ -25,6 +25,7 @@
 import cPickle as pickle
 import os
 import sqlite3
+import time
 
 
 class Database(object):
@@ -32,15 +33,23 @@ class Database(object):
     def __init__(self, name, direc):
         super(Database, self).__init__()
         self.name = name
-        self.dir = direc
-        self.path = os.path.join(direc, name)
+        self.dir = os.path.abspath(direc)
+        self.path = os.path.join(self.dir, self.name)
         self.table_name = 'seqs'
         self.structure = [('key', 'text'), ('value', 'text')]
+        self.initialized = False
         self._connection = None
         self._cursor = None
         self._create_table_cmd = None
         self._insert_cmd = None
-        self.create_table()
+        if not self.initialized:
+            self.create_table()
+
+    def __getitem__(self, key):
+        return self.find_one(key)
+
+    def __setitem__(self, key, value):
+        return self.insert_one(key, value)
 
 
     @property
@@ -49,11 +58,21 @@ class Database(object):
             self._connection = sqlite3.connect(self.path)
         return self._connection
 
+    @connection.setter
+    def connection(self, connection):
+        self._connection = connection
+
+
     @property
     def cursor(self):
         if self._cursor is None:
             self._cursor = self.connection.cursor()
         return self._cursor
+
+    @cursor.setter
+    def cursor(self, cursor):
+        self._cursor = cursor
+
 
     @property
     def create_table_cmd(self):
@@ -63,6 +82,7 @@ class Database(object):
                 field_string)
         return self._create_table_cmd
 
+
     @property
     def insert_cmd(self):
         if self._insert_cmd is None:
@@ -71,56 +91,78 @@ class Database(object):
         return self._insert_cmd
 
 
+    def commit(self):
+        self.connection.commit()
+
+
     def close(self):
         self.connection.close()
+        del self._cursor
+        del self._connection
+        self._cursor = None
+        self._connection = None
 
 
     def create_table(self):
         self.cursor.execute('DROP TABLE IF EXISTS {}'.format(self.table_name))
         self.cursor.execute(self.create_table_cmd)
+        self.initialized = True
 
 
-    def insert_one(self, value):
+    def insert_one(self, key, value):
         '''
         Inserts a single key/value pair
 
         Inputs:
-          value - an iterable (list or tuple) containing a single key/value pair
+          key - the key
+          value - the value
         '''
-        if len(value) != len(self.structure):
-            err = 'Mismatch between the supplied value:\n{}\n'.format(value)
-            err += 'and the structure of the table:\n{}'.format(self.structure)
-            raise RuntimeError(err)
-        self.cursor.execute(self.insert_cmd, value)
+        with self.connection as conn:
+            conn.execute(self.insert_cmd, (key, pickle.dumps(value, protocol=0)))
 
 
-    def insert_many(self, values):
+    def insert_many(self, data):
         '''
         Inserts multiple key/value pairs.
 
         Inputs:
-          values - a list of iterables (lists or tuples) with each iterable containing
+          data - a list of iterables (lists or tuples) with each iterable containing
                 a single key/value pair.
         '''
-        for val in values:
-            if len(val) != len(self.structure):
-                err = 'Mismatch between one of the supplied values:\n{}\n'.format(val)
+        for kv in data:
+            if len(kv) != len(self.structure):
+                err = 'Mismatch between one of the supplied values:\n{}\n'.format(kv)
                 err += 'and the structure of the table:\n{}'.format(self.structure)
                 raise RuntimeError(err)
-        self.cursor.executemany(self.insert_cmd, values)
+        data = [(d[0], pickle.dumps(d[1], protocol=0)) for d in data]
+        with self.connection as conn:
+            conn.executemany(self.insert_cmd, data)
 
 
-    def find(self, keys, unpickle=False):
+    def find_one(self, key):
         '''
         Searches a SQLite database.
 
         Inputs:
-          keys - a single key (as a string) or one or more keys (as a list or tuple),
-                containing the keys or which values will be returned
-          unpickle - boolean, whether to unpickle (via pickle.loads()) the results
-                before returning.
+          key - a single key (as a string)
 
-        Returns: a list of values
+        Returns: a single unpickled value
+        '''
+        self.cursor.execute(
+            '''SELECT seqs.key, seqs.value
+            FROM seqs
+            WHERE seqs.key LIKE ?''', (key, ))
+        return pickle.loads(str(self.cursor.fetchone()[1]))
+
+
+    def find(self, keys):
+        '''
+        Searches a SQLite database.
+
+        Inputs:
+          keys - a single key (string) or iterable (list/tuple) containing one or more keys
+
+        Returns: a list of unpickled values
         '''
         if type(keys) in [str, unicode]:
             keys = [keys, ]
@@ -131,28 +173,7 @@ class Database(object):
                 FROM seqs
                 WHERE seqs.key IN ({})'''.format(','.join('?' * len(chunk))), chunk)
             results.extend(result_chunk)
-        if unpickle:
-            return [pickle.loads(str(r[1])) for r in results]
-        return [r[1] for r in results]
-
-
-        # # convert the projection to a SQL SELECT string
-        # if project is not None:
-        #     select_list = self._parse_projection(project)
-        # else:
-        #     select_list = ['{}.{}'.format(self.table_name, s[0]) for s in self.structure]
-        # select_string = ', '.join(select_list)
-        # # convert the match into a SQL WHERE string and run query
-        # query = 'SELECT {} FROM {}'.format(select_string, self.table_name)
-        # if match is None:
-        #     results = self.cursor.execute(query)
-        # else:
-        #     where_list, where_vals = self._parse_match(match)
-        #     where_string = ' AND '.join(where_list)
-        #     query += ' WHERE {}'.format(where_string)
-        #     results = self.cursor.execute(query, where_vals)
-        # # fetch the results
-        # return results.fetchone() if find_one else results.fetchall()
+        return [pickle.loads(str(r[1])) for r in results]
 
 
     def index(self, field='key'):
@@ -171,35 +192,7 @@ class Database(object):
     @staticmethod
     def chunker(l, n=900):
         '''
-        Yield successive n-sized chunks from l.
+        Yields successive n-sized chunks from l.
         '''
         for i in xrange(0, len(l), n):
             yield l[i:i + n]
-
-
-    # def _parse_projection(self, project):
-    #     if type(project) in [str, unicode]:
-    #         select_fields = ['{}.{}'.format(self.table_name, project)]
-    #     elif type(project) in [list, tuple]:
-    #         select_fields = ['{}.{}'.format(self.table_name, p) for p in project]
-    #     elif type(project) == dict:
-    #         select_fields = ['{}.{}'.format(self.table_name, k) for k, v in project.items() if v]
-    #     else:
-    #         select_fields = []
-    #     return select_fields
-
-
-    # def _parse_match(self, match):
-    #     if type(match) != dict:
-    #         err = '<match> must be a dictonary. You provided:\n{}\n'.format(match)
-    #         err += 'which is {}'.format(type(match))
-    #         raise TypeError(err)
-    #     where_list = []
-    #     where_vals = []
-    #     for k, v in match.items():
-    #         if type(v) in [str, unicode]:
-    #             v = [v]
-    #         where_vals += v
-    #         where = '{} IN ({})'.format(k, ['?'] * len(v))
-    #         where_list.append(where)
-    #     return where_list, where_vals

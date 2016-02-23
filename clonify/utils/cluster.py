@@ -61,19 +61,19 @@ class Cluster(object):
     @property
     def sequences(self):
         if self._sequences is None and self.db is not None:
-            self._sequences = self.db.find(self.seq_ids, unpickle=True)
+            self._sequences = self.db.find(self.seq_ids)
         return self._sequences
 
     @property
     def name(self):
         if self._name is None:
-            self._name = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
+            self._name = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
         return self._name
 
 
     def json(self, other=None, as_file=False, temp_dir=None):
         other = other if other is not None else []
-        sequences = self.sequences + other
+        sequences = self.sequences + other.sequences
         if as_file:
             self.json_file = self.pretty_json(sequences, as_file, temp_dir)
             return self.json_file
@@ -98,7 +98,7 @@ class Cluster(object):
                                           junc_aa=s['junc_aa'],
                                           mut_string=mut_string,
                                           mut_num=s['var_muts_nt']['num']))
-        json_string = '[\n  ' + ', \n  '.join(jsons) + '\n] '
+        json_string = '[\n  ' + ', \n  '.join(jsons) + '\n] \n'
         if as_file:
             temp_dir = temp_dir if temp_dir is not None else '/tmp'
             jfile = tempfile.NamedTemporaryFile(dir=temp_dir, delete=False)
@@ -123,7 +123,7 @@ def get_clusters_from_file(cluster_file, mr_db=None):
         for line in f:
             s, c = line.strip().split()
             clusters[c] = clusters[c] + [s] if c in clusters else [s]
-    return [Cluster(seq_ids=v, mr_db=mr_db) for v in clusters.values()]
+    return [Cluster(seq_ids=v, mrdb=mr_db) for v in clusters.values()]
 
 
 BASE_JSON = '''  {{
