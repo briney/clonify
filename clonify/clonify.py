@@ -45,8 +45,8 @@ from abtools.queue.celery import celery
 from abtools.utils import progbar
 
 from utils import cluster
-from utils.cluster import Cluster
-from utils.database import Database, TinyDB, DBM
+from utils.cluster import Cluster, Clusters
+from utils.database import Database
 
 
 
@@ -111,6 +111,8 @@ def parse_args():
                         machine using multiprocessing or on a Celery cluster.')
     parser.add_argument('-n', '--no_update', dest='update', action='store_false', default=True,
                         help="Use to skip updating the MongoDB database with clonality info.")
+    parser.add_argument('--test-algo', action='store_true', default=False,
+                        help='Tests whether the cluster program works. Useful for troubleshooting.')
     parser.add_argument('-D', '--debug', dest='debug', action='store_true', default=False,
                         help="If set, will run in debug mode.")
     return parser.parse_args()
@@ -216,7 +218,7 @@ def get_collections(args):
 def query(collection, args):
     c = db[collection]
     vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
-    results = c.find({'chain': 'heavy', 'prod': 'yes'},
+    results = c.find({'chain': 'heavy', 'prod': 'yes', 'cdr3_len': {'$gte': 2}},
                      {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1, vdj_query: 1, 'var_muts_nt': 1})
     return [r for r in results]
 
@@ -232,16 +234,19 @@ def ensure_index(field, group):
 def update_db(clusters, group):
     print_update_info()
     start = time.time()
-    clust_count = len(clusters)
+    sizes = []
     p = mp.Pool(processes=250)
     async_results = []
     for c in clusters:
+        sizes.append(c.size)
         async_results.append(p.apply_async(update, args=(c, group)))
     monitor_update(async_results)
     p.close()
     p.join()
+    seq_count = sum(sizes)
     run_time = time.time() - start
-    logger.info('Updating took {} seconds. ({} sequences per second)'.format(round(run_time, 2), round(len(clusters) / run_time, 1)))
+    logger.info('Updating took {} seconds. ({} sequences per second)'.format(round(run_time, 2), round(seq_count / run_time, 1)))
+    return sizes
 
 
 def update(clust, group):
@@ -281,10 +286,11 @@ def get_sequences(collection_group, args):
 
 def build_json_db(seq_ids, json_files, args):
     logger.info('')
-    logger.info('Building a SQLite database of JSON files...')
+    logger.info('Building a database of JSON files...')
     jsondb = Database('json_db', args.temp)
-    for j, s in zip(json_files, seq_ids):
-        jsondb[j] = s
+    jsondb.insert_many(list(zip(json_files, seq_ids)))
+    # for j, s in zip(json_files, seq_ids):
+    #     jsondb[j] = s
     jsondb.commit()
     logger.info('Indexing...')
     jsondb.index()
@@ -294,7 +300,7 @@ def build_json_db(seq_ids, json_files, args):
 
 def build_mr_db(sequences, args):
     logger.info('')
-    logger.info('Building a SQLite database of sequences for map-reduce lookup...')
+    logger.info('Building a database of sequences...')
     # hackety hackerson to pickle the JSON data into a SQLite db, but
     # since the db is just for rapid lookup of the JSON data by seq_id,
     # I'm OK with it.
@@ -322,27 +328,67 @@ def clonify(json_files, mr_db, json_db, args):
     # map
     if args.celery:
         logger.info('')
-        logger.info('Running map jobs via Celery...')
+        logger.info('Running Clonify jobs via Celery...')
         cluster_files = run_map_jobs_via_celery(json_files, json_db, args)
-    elif args.debug:
+    elif any([args.debug, args.num_map_workers == 1]):
         logger.info('')
-        logger.info('Running map jobs via a single process...')
+        logger.info('Running Clonify...')
         cluster_files = run_map_jobs_singlethreaded(json_files, json_db, args)
     else:
         logger.info('')
-        logger.info('Running map jobs via multiprocessing...')
+        logger.info('Running Clonify jobs via multiprocessing...')
         cluster_files = run_map_jobs_via_multiprocessing(json_files, json_db, args)
+    logger.info('')
     # reduce
-    if len(cluster_files) == 1:
+    if args.num_map_workers == 1:
         return cluster.get_clusters_from_file(cluster_files[0], mr_db=mr_db)
-    if args.debug:
-        logger.info('')
-        logger.info('Running reduce jobs with a single process...')
-        return run_reduce_jobs_singlethreaded(cluster_files, mr_db, json_db, args)
     else:
-        logger.info('')
-        logger.info('Running reduce jobs via multiprocessing...')
-        return run_reduce_jobs_via_multiprocessing(cluster_files, mr_db, json_db, args)
+        reduced_clusters = clonify_reduce(cluster_files, mr_db)
+        return reduced_clusters
+    # if args.num_map_workers == 1:
+    #     return cluster.get_clusters_from_file(cluster_files[0], mr_db=mr_db)
+    # if args.debug:
+    #     logger.info('')
+    #     logger.info('Running reduce jobs with a single process...')
+    #     return run_reduce_jobs_singlethreaded(cluster_files, mr_db, json_db, args)
+    # else:
+    #     logger.info('')
+    #     logger.info('Running reduce jobs via multiprocessing...')
+    #     return run_reduce_jobs_via_multiprocessing(cluster_files, mr_db, json_db, args)
+
+
+def test_clonify_algorithm(json_files, mr_db, json_db, args):
+    p = mp.Pool(maxtasksperchild=50)
+    async_results = []
+    for j in json_files:
+        logger.debug(j)
+        async_results.append([j, p.apply_async(test_algo, (j, ))])
+    monitor_mp_jobs([a[1] for a in async_results])
+    results = []
+    for a in async_results:
+        try:
+            results.append(a[1].get())
+        except:
+            logger.info('FILE-LEVEL EXCEPTION: {}'.format(a[0]))
+            logger.info(''.join(traceback.format_exc()))
+    p.close()
+    p.join()
+
+
+def test_algo(json_file):
+    cluster_file = json_file + '_cluster'
+    clonify_cmd = 'cluster {} {}'.format(json_file, cluster_file)
+    p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+    stdout, stderr = p.communicate()
+    try:
+        of = open(cluster_file, 'r')
+        of.close()
+    except IOError:
+        logger.info('\nFAILED FILE: {}'.format(json_file))
+        print(stderr.strip())
+        logger.debug(traceback.format_exc())
+        # logger.info('')
+
 
 
 def run_map_jobs_singlethreaded(json_files, json_db, args):
@@ -504,72 +550,93 @@ def clonify_map(json_file, json_db, args):
     return seq_cluster_file
 
 
+# @celery.task
+# def clonify_reduce(cluster_pair, mr_db, json_db, args):
 @celery.task
-def clonify_reduce(cluster_pair, mr_db, json_db, args):
+def clonify_reduce(cluster_files, mr_db):
+
     '''
     Given a pair of cluster file names, merge their clusters.
 
     Returns the name of a new cluster file containing the merged results
     and deletes the input cluster files.
     '''
-    # get Cluster objects for each cluster file
-    merged = cluster.get_clusters_from_file(cluster_pair[0], mr_db)
-    comparison = cluster.get_clusters_from_file(cluster_pair[1], mr_db)
-    # compare the clusters
-    for cc in comparison:
-        merge_happened = False
-        for i, cm in enumerate(merged):
-            # logger.debug('cm: ', cm.name)
-            # logger.debug('cc: ', cc.name)
-            json_file = cm.json(other=cc, as_file=True, temp_dir=args.temp)
-            json_db[json_file] = cm.seq_ids + cc.seq_ids
-            cluster_file = clonify_map(json_file, json_db, args)
-            json_db.close()
-            _clusters = cluster.get_clusters_from_file(cluster_file, mr_db=mr_db)
-            # If cm isn't in _clusters, some merging happened.
-            # We need to remove cm from the merged list and replace
-            # it with _clusters (which is likely to be just one cluster,
-            # but may contain two new clusters)
-            if cm not in _clusters:
-                del merged[i]
-                merged += _clusters
-                merge_happened = True
-                logger.debug('MERGED: {}, {}'.format(cc.name, cm.name))
-                break
-        # if we've checked all of the merged clusters and the comparison
-        # cluster didn't merge with any of them, append to the merged list
-        if not merge_happened:
-            logger.debug('UNMERGED: {}'.format(cc.name))
-            merged.append(cc)
-    # set up a new, merged cluster file
-    temp_dir = os.path.dirname(cluster_pair[0])
-    new_cluster_file = tempfile.NamedTemporaryFile(dir=temp_dir, delete=False)
-    # remove the old cluster files
-    for old_file in cluster_pair:
-        os.unlink(old_file)
-    # assemble/write the data for the merged cluster file
-    cluster_assignments = []
-    for i, m in enumerate(merged):
-        assignments = zip(m.seq_ids, [str(i)] * len(m.seq_ids))
-        cluster_assignments += ['\t'.join(a) for a in assignments]
+    # build a Clusters object of clusters from the clonify_map output
+    clusters = Clusters()
+    for f in cluster_files:
+        clusters.add(cluster.get_clusters_from_file(f, mr_db=mr_db))
+
+    # configure the Clusters object
+    logger.info('')
+    logger.info('Getting cluster sequences...')
+    clusters.get_sequences()
+    logger.info('')
+    logger.info('Getting cluster centroids...')
+    clusters.get_centroids()
+    logger.info('')
+    logger.info('Building cluster database...')
+    clusters.build_cluster_db()
+
+    # reduce
+    print('Reducing clusters...')
+    reduced_clusters = clusters.reduce()
+    return reduced_clusters
 
 
-    logger.debug('CLUSTER_ASSIGNMENTS: {}'.format('\n'.join(cluster_assignments)))
+    # # get Cluster objects for each cluster file
+    # merged = cluster.get_clusters_from_file(cluster_pair[0], mr_db)
+    # comparison = cluster.get_clusters_from_file(cluster_pair[1], mr_db)
+    # # compare the clusters
+    # for cc in comparison:
+    #     merge_happened = False
+    #     for i, cm in enumerate(merged):
+    #         if cm.should_compare(cc):
+    #             # logger.debug('cm: ', cm.name)
+    #             # logger.debug('cc: ', cc.name)
+    #             json_file = cm.json(other=cc, as_file=True, temp_dir=args.temp)
+    #             json_db[json_file] = cm.seq_ids + cc.seq_ids
+    #             cluster_file = clonify_map(json_file, json_db, args)
+    #             json_db.close()
+    #             _clusters = cluster.get_clusters_from_file(cluster_file, mr_db=mr_db)
+    #             # If cm isn't in _clusters, some merging happened.
+    #             # We need to remove cm from the merged list and replace
+    #             # it with _clusters (which is likely to be just one cluster,
+    #             # but may contain two new clusters)
+    #             if cm not in _clusters:
+    #                 del merged[i]
+    #                 merged += _clusters
+    #                 merge_happened = True
+    #                 logger.debug('MERGED: {}, {}'.format(cc.name, cm.name))
+    #                 break
+    #     # if we've checked all of the merged clusters and the comparison
+    #     # cluster didn't merge with any of them, append to the merged list
+    #     if not merge_happened:
+    #         logger.debug('UNMERGED: {}'.format(cc.name))
+    #         merged.append(cc)
+    # # set up a new, merged cluster file
+    # temp_dir = os.path.dirname(cluster_pair[0])
+    # new_cluster_file = tempfile.NamedTemporaryFile(dir=temp_dir, delete=False)
+    # # remove the old cluster files
+    # for old_file in cluster_pair:
+    #     os.unlink(old_file)
+    # # assemble/write the data for the merged cluster file
+    # cluster_assignments = []
+    # for i, m in enumerate(merged):
+    #     assignments = zip(m.seq_ids, [str(i)] * len(m.seq_ids))
+    #     cluster_assignments += ['\t'.join(a) for a in assignments]
+    # new_cluster_file.write('\n'.join(cluster_assignments))
+    # return new_cluster_file.name
 
 
-
-    new_cluster_file.write('\n'.join(cluster_assignments))
-    return new_cluster_file.name
-
-
-def write_output(clusters, args, collection_group=None):
+def write_output(clusters, mr_db, args, collection_group=None):
     collection = '|'.join(collection_group) if collection_group is not None else args.collection
     oname = '{}_{}_clusters.txt'.format(args.db, collection) if collection else '{}_clusters.txt'.format(args.db)
     ofile = os.path.join(args.output, oname)
     open(ofile, 'w').write('')
     ohandle = open(ofile, 'a')
     for c in clusters:
-        output = ['#' + c.name] + ['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in c.sequences]
+        sequences = mr_db.find(c.seq_ids)
+        output = ['#' + c.name] + ['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in sequences]
         ohandle.write('\n'.join(output))
         ohandle.write('\n\n')
 
@@ -642,13 +709,13 @@ def print_query_info(coll_seqs, nr=None):
         logger.info('{} were left after collapsing identical sequences.'.format(len(nr)))
 
 
-def print_clonify_input_building(seqs):
+def print_clonify_input_building(seq_count):
     rstring = 'RUNNING CLONIFY'
     logger.info('\n\n')
     logger.info('=' * (len(rstring) + 16))
     logger.info(rstring)
     logger.info('=' * (len(rstring) + 16))
-    logger.info('\nBuilding Clonify input for {} total sequences.'.format(len(seqs)))
+    logger.info('\nBuilding Clonify input for {} total sequences.'.format(seq_count))
 
 
 def print_clonify_start():
@@ -670,14 +737,14 @@ def print_update_info():
     logger.info('Updating the MongoDB database with clonality info')
 
 
-def print_finished(seq_ids, clusters):
-    seq_count = len(seq_ids)
-    clust_count = len(clusters)
-    clust_sizes = [len(clusters[c]) for c in clusters.keys()]
-    clustered_seqs = sum(clust_sizes)
+def print_finished(clust_sizes):
+    non_singletons = [c for c in clust_sizes if c > 1]
+    seq_count = sum(clust_sizes)
+    clust_count = len(non_singletons)
+    clustered_seqs = sum(non_singletons)
     if clust_count > 0:
         avg_clust_size = float(clustered_seqs) / clust_count
-        max_clust_size = max(clust_sizes)
+        max_clust_size = max(non_singletons)
     else:
         avg_clust_size = 0
         max_clust_size = 0
@@ -707,6 +774,7 @@ def main(args):
     for i, collection_group in enumerate(collection_groups):
         print_collection_group_info(collection_group, i)
         seqs = get_sequences(collection_group, args)
+        seq_count = len(seqs)
         mr_db = build_mr_db(seqs, args)
         if len(seqs) == 0:
             continue
@@ -738,14 +806,23 @@ def main(args):
 
         # Run clonify jobs via multiprocessing or Celery
         # Should return a list of Cluster objects for each subfile
+        # if args.test_algo:
+        #     test_clonify_algorithm(json_files, mr_db, json_db, args)
+        # else:
+        #     clusters = clonify(json_files, mr_db, json_db, args)
+        print_clonify_input_building(seq_count)
         clusters = clonify(json_files, mr_db, json_db, args)
 
 
         if args.output:
             print_output(args)
             name = collection_group if len(collection_group) == 1 else str(i)
-            write_output(clusters, args, collection_group=name)
-            logger.info('')
+            write_output(clusters, mr_db, args, collection_group=name)
+        if args.update:
+            cluster_sizes = update_db(clusters, collection_group)
+        else:
+            cluster_sizes = [c.size for c in clusters]
+        print_finished(cluster_sizes)
 
 
 def run_standalone(args):

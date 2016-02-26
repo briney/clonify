@@ -30,11 +30,15 @@ import time
 
 class Database(object):
     """docstring for Database"""
-    def __init__(self, name, direc):
+    def __init__(self, name=None, direc=None, in_memory=False):
         super(Database, self).__init__()
         self.name = name
-        self.dir = os.path.abspath(direc)
-        self.path = os.path.join(self.dir, self.name)
+        if all([name is not None, direc is not None]):
+            self.dir = os.path.abspath(direc)
+            self.path = os.path.join(self.dir, self.name)
+        elif in_memory:
+            self.dir = None
+            self.path = ':memory:'
         self.table_name = 'seqs'
         self.structure = [('key', 'text'), ('value', 'text')]
         self.initialized = False
@@ -126,15 +130,15 @@ class Database(object):
         Inserts multiple key/value pairs.
 
         Inputs:
-          data - a list of iterables (lists or tuples) with each iterable containing
+          data - a list/generator of iterables (lists or tuples) with each iterable containing
                 a single key/value pair.
         '''
-        for kv in data:
-            if len(kv) != len(self.structure):
-                err = 'Mismatch between one of the supplied values:\n{}\n'.format(kv)
-                err += 'and the structure of the table:\n{}'.format(self.structure)
-                raise RuntimeError(err)
-        data = [(d[0], pickle.dumps(d[1], protocol=0)) for d in data]
+        # for kv in data:
+        #     if len(kv) != len(self.structure):
+        #         err = 'Mismatch between one of the supplied values:\n{}\n'.format(kv)
+        #         err += 'and the structure of the table:\n{}'.format(self.structure)
+        #         raise RuntimeError(err)
+        data = ((d[0], pickle.dumps(d[1], protocol=0)) for d in data)
         with self.connection as conn:
             conn.executemany(self.insert_cmd, data)
 
@@ -150,8 +154,8 @@ class Database(object):
         '''
         self.cursor.execute(
             '''SELECT seqs.key, seqs.value
-            FROM seqs
-            WHERE seqs.key LIKE ?''', (key, ))
+               FROM seqs
+               WHERE seqs.key LIKE ?''', (key, ))
         return pickle.loads(str(self.cursor.fetchone()[1]))
 
 
@@ -170,10 +174,37 @@ class Database(object):
         for chunk in self.chunker(keys):
             result_chunk = self.cursor.execute(
                 '''SELECT seqs.key, seqs.value
-                FROM seqs
-                WHERE seqs.key IN ({})'''.format(','.join('?' * len(chunk))), chunk)
+                   FROM seqs
+                   WHERE seqs.key IN ({})'''.format(','.join('?' * len(chunk))), chunk)
             results.extend(result_chunk)
         return [pickle.loads(str(r[1])) for r in results]
+
+
+    def find_all(self):
+        '''
+        Returns all values in a SQLite database.
+
+        Inputs:
+          keys - a single key (string) or iterable (list/tuple) containing one or more keys
+
+        Returns: a list of unpickled values
+        '''
+        if type(keys) in [str, unicode]:
+            keys = [keys, ]
+        results = self.cursor.execute(
+            '''SELECT seqs.value
+               FROM seqs''')
+        return [pickle.loads(str(r[0])) for r in results]
+
+
+    def delete(self, keys):
+        if type(keys) in [str, unicode]:
+            keys = [keys, ]
+        with self.connection as conn:
+            conn.executemany(
+                '''DELETE
+                   FROM seqs
+                   WHERE seqs.key == ?''', keys)
 
 
     def index(self, field='key'):
