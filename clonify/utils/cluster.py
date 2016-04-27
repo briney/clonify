@@ -280,8 +280,10 @@ class Cluster(object):
                 centroid = self.sequences[0]
             else:
                 c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
-                            threshold=0.5)
-                cent = c.centroid()
+                            threshold=0.5,
+                            quiet=True)
+                c = sorted(c, key=lambda x: x.size, reverse=True)[0]
+                cent = c.centroid
                 centroid = self.db.find_one(cent.id)
             centroid['name'] = '{}_{}'.format(self.name, '0')
             self._centroids.append(centroid)
