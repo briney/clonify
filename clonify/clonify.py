@@ -41,6 +41,7 @@ import traceback
 import urllib
 
 from abtools import log, mongodb
+from abtools.pipeline import make_dir
 from abtools.queue.celery import celery
 from abtools.utils import progbar
 
@@ -81,10 +82,10 @@ def parse_args():
     parser.add_argument('-o', '--out', dest='output', default='',
                         help="Directory for the output files. Files will be named '<collection>_clones.txt'. \
                         Failing to provide an output directory will result in no output files being written.")
-    parser.add_argument('-t', '--temp', dest='temp', default=None,
+    parser.add_argument('-t', '--temp', dest='temp', default='/tmp',
                         help="The directory in which temp files will be stored. \
-                        If the directory doesn't exist, it will be created. Required.")
-    parser.add_argument('-l', '--log', dest='logfile', required=True,
+                        If the directory doesn't exist, it will be created. Default is '/tmp'.")
+    parser.add_argument('-l', '--log', dest='logfile',
                         help="Path to the log file. Required.")
     parser.add_argument('--non-redundant', default=False,
                         help="Collapses identical sequences prior to running Clonify. \
@@ -152,6 +153,12 @@ class Args(object):
         self.debug = debug
 
 
+def validate_args(args):
+    for d in [args.output, args.temp]:
+        if d is not None:
+            make_dir(d)
+
+
 ################################
 #
 #            MONGO
@@ -217,9 +224,10 @@ def get_collections(args):
 
 def query(collection, args):
     c = db[collection]
-    vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
+    # vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
     results = c.find({'chain': 'heavy', 'prod': 'yes', 'cdr3_len': {'$gte': 2}},
-                     {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1, vdj_query: 1, 'var_muts_nt': 1})
+                     {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1,
+                      'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1})
     return [r for r in results]
 
 
@@ -826,6 +834,7 @@ def main(args):
 
 
 def run_standalone(args):
+    validate_args(args)
     global logger
     logfile = get_logfile(args)
     log.setup_logging(logfile, debug=args.debug)
@@ -834,6 +843,7 @@ def run_standalone(args):
 
 
 def run(**kwargs):
+    validate_args(args)
     args = Args(**kwargs)
     global logger
     log.get_logger('clonify')
@@ -842,6 +852,7 @@ def run(**kwargs):
 
 if __name__ == '__main__':
     args = parse_args()
+    validate_args(args)
     logfile = get_logfile(args)
     log.setup_logging(logfile, debug=args.debug)
     logger = log.get_logger('clonify')
