@@ -276,18 +276,18 @@ class Cluster(object):
     def centroids(self):
         if self._centroids is None:
             self._centroids = []
-            # c = abtools.cluster.cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
-            #                             threshold=0.9)
-            # cent = c.centroid()
-            # centroid = self.db.find_one(cent.id)
-            # centroid['name'] = '{}_{}'.format(self.name, i)
-            # self._centroids.append(centroid)
+            c = abtools.cluster.cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
+                                        threshold=0.9)
+            cent = c.centroid()
+            centroid = self.db.find_one(cent.id)
+            centroid['name'] = '{}_{}'.format(self.name, i)
+            self._centroids.append(centroid)
 
-            num = int(math.ceil(self.size / 100.))
-            for i in range(num):
-                seq = random.choice(self.sequences)
-                seq['name'] = '{}_{}'.format(self.name, i)
-                self._centroids.append(seq)
+            # num = int(math.ceil(self.size / 100.))
+            # for i in range(num):
+            #     seq = random.choice(self.sequences)
+            #     seq['name'] = '{}_{}'.format(self.name, i)
+            #     self._centroids.append(seq)
         return self._centroids
 
 
