@@ -750,7 +750,7 @@ def print_finished(clust_sizes):
         max_clust_size = 0
     logger.info('\n{0} sequences were segregated into {1} clonal families.'.format(seq_count, clust_count))
     logger.info('The average cluster size was %0.2f.' % (avg_clust_size))
-    logger.info('The largest cluster contains {} seqeunces.'.format(max_clust_size))
+    logger.info('The largest cluster contains {} sequences.'.format(max_clust_size))
     logger.info('%s sequences were assigned to clonal families (%0.2f%% of all sequences).' % (clustered_seqs, 100.0 * clustered_seqs / seq_count))
     logger.info('\n')
 
