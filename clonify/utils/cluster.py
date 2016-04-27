@@ -283,7 +283,7 @@ class Cluster(object):
                             threshold=0.5)
                 cent = c.centroid()
                 centroid = self.db.find_one(cent.id)
-            centroid['name'] = '{}_{}'.format(self.name, i)
+            centroid['name'] = '{}_{}'.format(self.name, '0')
             self._centroids.append(centroid)
 
             # num = int(math.ceil(self.size / 100.))
