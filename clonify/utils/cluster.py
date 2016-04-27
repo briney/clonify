@@ -276,10 +276,13 @@ class Cluster(object):
     def centroids(self):
         if self._centroids is None:
             self._centroids = []
-            c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
-                        threshold=0.5)
-            cent = c.centroid()
-            centroid = self.db.find_one(cent.id)
+            if self.size == 1:
+                centroid = self.sequences[0]
+            else:
+                c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
+                            threshold=0.5)
+                cent = c.centroid()
+                centroid = self.db.find_one(cent.id)
             centroid['name'] = '{}_{}'.format(self.name, i)
             self._centroids.append(centroid)
 
