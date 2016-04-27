@@ -33,7 +33,7 @@ import tempfile
 
 from database import Database
 
-import abtools
+import abtools.cluster import cluster
 from abtools.utils import progbar
 
 
@@ -276,8 +276,8 @@ class Cluster(object):
     def centroids(self):
         if self._centroids is None:
             self._centroids = []
-            c = abtools.cluster.cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
-                                        threshold=0.9)
+            c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
+                        threshold=0.9)
             cent = c.centroid()
             centroid = self.db.find_one(cent.id)
             centroid['name'] = '{}_{}'.format(self.name, i)
