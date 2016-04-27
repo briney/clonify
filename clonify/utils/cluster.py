@@ -33,7 +33,7 @@ import tempfile
 
 from database import Database
 
-import abtools.cluster import cluster
+from abtools.cluster import cluster
 from abtools.utils import progbar
 
 
