@@ -277,7 +277,7 @@ class Cluster(object):
         if self._centroids is None:
             self._centroids = []
             c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
-                        threshold=0.9)
+                        threshold=0.5)
             cent = c.centroid()
             centroid = self.db.find_one(cent.id)
             centroid['name'] = '{}_{}'.format(self.name, i)
