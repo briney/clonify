@@ -217,9 +217,10 @@ def get_collections(args):
 
 def query(collection, args):
     c = db[collection]
-    vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
+    # vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
     results = c.find({'chain': 'heavy', 'prod': 'yes', 'cdr3_len': {'$gte': 2}},
-                     {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1, vdj_query: 1, 'var_muts_nt': 1})
+                     {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1,
+                      'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1})
     return [r for r in results]
 
 
