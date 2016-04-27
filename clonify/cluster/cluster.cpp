@@ -741,12 +741,15 @@ namespace cluster_param {
 /*
  * Input data limits. They must NEVER be exceeded.
  */
-const int MAX_SEQUENCES = 3500000;
+// const int MAX_SEQUENCES = 35000000; // original value
+ const int MAX_SEQUENCES = 25000000;
 const int MAX_AVERAGE_MUTATIONS_PER_SEQUENCE = 32;
 const int MAX_PARTITIONS = 7 + 1;
 const int MAX_SEQUENCES_PER_PARTITION = MAX_SEQUENCES/2;
-const int MAX_ESSENCES_PER_PARTITION = MAX_SEQUENCES_PER_PARTITION/5;
-const int MAX_CLUSTERS_PER_PARTITION = 256 + MAX_SEQUENCES_PER_PARTITION/50;
+// const int MAX_ESSENCES_PER_PARTITION = MAX_SEQUENCES_PER_PARTITION/5; // original value
+const int MAX_ESSENCES_PER_PARTITION = MAX_SEQUENCES_PER_PARTITION/2;
+// const int MAX_CLUSTERS_PER_PARTITION = 256 + MAX_SEQUENCES_PER_PARTITION/50; // original value
+const int MAX_CLUSTERS_PER_PARTITION = 256 + MAX_SEQUENCES_PER_PARTITION/32;
 const int MAX_AA_LENGTH = 64;
 const int MAX_MUTATION_LOC = 4096;
 
@@ -1362,7 +1365,7 @@ T* pool_new(vector<T>& pool, T&& value) {
 
 StringSlice quoted_slice(const char *ptr) {
     const char *end = strchr(ptr, '"');
-    //range_check(end != 0);
+    range_check(end != 0);
     return Slice<char> { ptr, (int)(end-ptr) };
 }
 

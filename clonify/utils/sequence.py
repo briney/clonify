@@ -46,7 +46,7 @@ class Sequence(object):
 						'full': v_full,
 						'gene': v_fam}),
 			('junc_aa', junc_aa),
-			('var_muts_nt': {'muts': muts,
-							 'num': muc_count})
-			])
+			('var_muts_nt', {'muts': muts,
+							 'num': mut_count})
+		])
 		return json.dumps(j) + '\n'

@@ -201,9 +201,6 @@ def get_cluster_ids(cluster):
 	return ids
 
 
-
-
-
 def expand_clusters(nr_clusters, nr_db):
 	index_nr_db(nr_db)
 	print('Expanding non-redundant sequences...', end='')
@@ -226,8 +223,3 @@ def make_nr(seqs, nr_db, args):
 	nr_jsons = json_lookup(nr_ids, lookup_db)
 	remove_lookup_db(args)
 	return nr_jsons
-
-
-
-
-
