@@ -41,6 +41,7 @@ import traceback
 import urllib
 
 from abtools import log, mongodb
+from abtools.pipeline import make_dir
 from abtools.queue.celery import celery
 from abtools.utils import progbar
 
@@ -81,10 +82,10 @@ def parse_args():
     parser.add_argument('-o', '--out', dest='output', default='',
                         help="Directory for the output files. Files will be named '<collection>_clones.txt'. \
                         Failing to provide an output directory will result in no output files being written.")
-    parser.add_argument('-t', '--temp', dest='temp', default=None,
+    parser.add_argument('-t', '--temp', dest='temp', default='/tmp',
                         help="The directory in which temp files will be stored. \
-                        If the directory doesn't exist, it will be created. Required.")
-    parser.add_argument('-l', '--log', dest='logfile', required=True,
+                        If the directory doesn't exist, it will be created. Default is '/tmp'.")
+    parser.add_argument('-l', '--log', dest='logfile',
                         help="Path to the log file. Required.")
     parser.add_argument('--non-redundant', default=False,
                         help="Collapses identical sequences prior to running Clonify. \
@@ -150,6 +151,12 @@ class Args(object):
         self.celery = celery
         self.update = update
         self.debug = debug
+
+
+def validate_args(args):
+    for d in [args.output, args.temp]:
+        if d is not None:
+            make_dir(d)
 
 
 ################################
@@ -827,6 +834,7 @@ def main(args):
 
 
 def run_standalone(args):
+    validate_args(args)
     global logger
     logfile = get_logfile(args)
     log.setup_logging(logfile, debug=args.debug)
@@ -835,6 +843,7 @@ def run_standalone(args):
 
 
 def run(**kwargs):
+    validate_args(args)
     args = Args(**kwargs)
     global logger
     log.get_logger('clonify')
@@ -843,6 +852,7 @@ def run(**kwargs):
 
 if __name__ == '__main__':
     args = parse_args()
+    validate_args(args)
     logfile = get_logfile(args)
     log.setup_logging(logfile, debug=args.debug)
     logger = log.get_logger('clonify')
