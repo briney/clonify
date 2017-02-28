@@ -275,24 +275,24 @@ class Cluster(object):
     @property
     def centroids(self):
         if self._centroids is None:
-            self._centroids = []
-            if self.size == 1:
-                centroid = self.sequences[0]
-            else:
-                c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
-                            threshold=0.7,
-                            quiet=True)
-                c = sorted(c, key=lambda x: x.size, reverse=True)[0]
-                cent = c.centroid
-                centroid = self.db.find_one(cent.id)
-            centroid['name'] = '{}_{}'.format(self.name, '0')
-            self._centroids.append(centroid)
+            # self._centroids = []
+            # if self.size == 1:
+            #     centroid = self.sequences[0]
+            # else:
+            #     c = cluster([(s['seq_id'], s['vdj_nt']) for s in self.sequences],
+            #                 threshold=0.7,
+            #                 quiet=True)
+            #     c = sorted(c, key=lambda x: x.size, reverse=True)[0]
+            #     cent = c.centroid
+            #     centroid = self.db.find_one(cent.id)
+            # centroid['name'] = '{}_{}'.format(self.name, '0')
+            # self._centroids.append(centroid)
 
-            # num = int(math.ceil(self.size / 100.))
-            # for i in range(num):
-            #     seq = random.choice(self.sequences)
-            #     seq['name'] = '{}_{}'.format(self.name, i)
-            #     self._centroids.append(seq)
+            num = int(math.ceil(self.size / 100.))
+            for i in range(num):
+                seq = random.choice(self.sequences)
+                seq['name'] = '{}_{}'.format(self.name, i)
+                self._centroids.append(seq)
         return self._centroids
 
 
