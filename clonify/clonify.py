@@ -94,6 +94,11 @@ def parse_args():
                         Options are 'nt' or 'aa', which collapse identical nucleotide or amino acid sequences, respectively. \
                         Best for collections that contain redundant sequences \
                         and are large enough to cause clonify segfaults.")
+    parser.add_argument('-i', '--isotype', dest='isotype', default=None, choices=['IgG', 'IgM', 'IgD', 'IgE', 'IgA'],
+                        help="If set, will only assign lineages using sequences of the specified isotype. \
+                        If not set, all sequences will be used, regardless of isotype. \
+                        Choices are 'IgG' 'IgD', 'IgA', 'IgE', and 'IgM'. \
+                        Default is to use all sequences.")
     parser.add_argument('--clustering-threshold', default=1.0, type=float,
                         help="Clustering threshold to be used with the --non-redundant option. \
                         Default is 1.0.")
@@ -125,7 +130,7 @@ class Args(object):
         collection_prefix=None, collection_prefix_split=None, collection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, log=None, non_redundant=False, clustering_threshold=1.0,
-        distance_cutoff=0.35, celery=False, update=True, debug=False):
+        isotype=None, distance_cutoff=0.35, celery=False, update=True, debug=False):
         super(Args, self).__init__()
         if any([db is None, temp is None, logfile is None]):
             print('ERROR: the following options are required:')
@@ -148,6 +153,7 @@ class Args(object):
         self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
         self.distance_cutoff = float(distance_cutoff)
+        self.isotype = isotype
         self.celery = celery
         self.update = update
         self.debug = debug
@@ -225,9 +231,12 @@ def get_collections(args):
 def query(collection, args):
     c = db[collection]
     # vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
-    results = c.find({'chain': 'heavy', 'prod': 'yes', 'cdr3_len': {'$gte': 2}},
-                     {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1,
-                      'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1})
+    query = {'chain': 'heavy', 'prod': 'yes', 'cdr3_len': {'$gte': 2}}
+    if args.isotype is not None:
+        query['isotype'] = args.isotype
+    project = {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1,
+               'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
+    results = c.find(query, project)
     return [r for r in results]
 
 
