@@ -275,7 +275,7 @@ class Cluster(object):
     @property
     def centroids(self):
         if self._centroids is None:
-            # self._centroids = []
+            self._centroids = []
             # if self.size == 1:
             #     centroid = self.sequences[0]
             # else:
