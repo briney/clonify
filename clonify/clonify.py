@@ -94,7 +94,7 @@ def parse_args():
                         Options are 'nt' or 'aa', which collapse identical nucleotide or amino acid sequences, respectively. \
                         Best for collections that contain redundant sequences \
                         and are large enough to cause clonify segfaults.")
-    parser.add_argument('-i', '--isotype', dest='isotype', default=None, choices=['IgG', 'IgM', 'IgD', 'IgE', 'IgA'],
+    parser.add_argument('-I', '--isotype', dest='isotype', default=None, choices=['IgG', 'IgM', 'IgD', 'IgE', 'IgA'],
                         help="If set, will only assign lineages using sequences of the specified isotype. \
                         If not set, all sequences will be used, regardless of isotype. \
                         Choices are 'IgG' 'IgD', 'IgA', 'IgE', and 'IgM'. \
