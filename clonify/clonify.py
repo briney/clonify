@@ -779,6 +779,7 @@ def main(args):
             name = collection_group if len(collection_group) == 1 else str(i)
             write_output(clusters, mr_db, args, collection_group=name)
         if args.update:
+            ensure_index('seq_id', collection_group)
             lineages = [(c.name, c.size, c.seq_ids) for c in clusters]
             cluster_sizes = update_db(lineages, db_params, collection_group)
         else:
