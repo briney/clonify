@@ -249,15 +249,14 @@ def ensure_index(field, group):
         coll.ensure_index(field)
 
 
-def update_db(clusters, group):
+def update_db(lineages, db_params, group):
     print_update_info()
     start = time.time()
-    sizes = []
     p = mp.Pool(processes=250)
     async_results = []
-    for c in clusters:
-        sizes.append(c.size)
-        async_results.append(p.apply_async(update, args=(c, group)))
+    sizes = [l[1] for l in lineages]
+    for lchunk in chunker(lineages, size=50):
+        async_results.append(p.apply_async(update, args=(lchunk, db_params, group)))
     monitor_update(async_results)
     p.close()
     p.join()
@@ -267,12 +266,16 @@ def update_db(clusters, group):
     return sizes
 
 
-def update(clust, group):
-    for collection in group:
-        c = db[collection]
-        c.update({'seq_id': {'$in': clust.seq_ids}},
-                 {'$set': {'clonify': {'id': clust.name, 'size': clust.size}}},
-                 multi=True)
+def update(lineages, db_params, group):
+    DB = mongodb.get_db(*db_params)
+    for lineage in lineages:
+        name = lineage[0]
+        size = lineage[1]
+        seq_ids = lineage[2]
+        for collection in group:
+            c = DB[collection]
+            c.update_many({'seq_id': {'$in': seq_ids}},
+                          {'$set': {'clonify': {'id': name, 'size': size}}})
 
 
 def get_sequences(collection_group, args):
@@ -724,6 +727,7 @@ def get_logfile(args):
 def main(args):
     global db
     db = mongodb.get_db(args.db, args.ip, args.port, args.user, args.password)
+    db_params = [args.db, args.ip, args.port, args.user, args.password]
     collection_groups = get_collection_groups(args)
     print_start_info(collection_groups, args)
 
@@ -775,7 +779,8 @@ def main(args):
             name = collection_group if len(collection_group) == 1 else str(i)
             write_output(clusters, mr_db, args, collection_group=name)
         if args.update:
-            cluster_sizes = update_db(clusters, collection_group)
+            lineages = [(c.name, c.size, c.seq_ids) for c in clusters]
+            cluster_sizes = update_db(lineages, db_params, collection_group)
         else:
             cluster_sizes = [c.size for c in clusters]
         print_finished(cluster_sizes)
