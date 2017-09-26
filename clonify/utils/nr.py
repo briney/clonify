@@ -2,7 +2,7 @@
 # filename: nr.py
 
 #
-# Copyright (c) 2015 Bryan Briney
+# Copyright (c) 2017 Bryan Briney
 # License: The MIT license (http://opensource.org/licenses/MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software

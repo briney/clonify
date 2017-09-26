@@ -2,7 +2,7 @@
 # filename: cluster.py
 
 #
-# Copyright (c) 2015 Bryan Briney
+# Copyright (c) 2017 Bryan Briney
 # License: The MIT license (http://opensource.org/licenses/MIT)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software
@@ -407,11 +407,22 @@ def get_clusters_from_file(cluster_file, mr_db=None):
     From clonify_map() output (a cluster file), return a list of
     Cluster objects.
     '''
+    print('\nReading cluster file and retrieving cluster sequences...')
+    clust_count = 0
+    with open(cluster_file) as f:
+        for line in f:
+            if line.strip():
+                clust_count += 1
     clusters = {}
+    counter = 0
+    progbar.progress_bar(counter, clust_count)
     with open(cluster_file) as f:
         for line in f:
             s, c = line.strip().split()
             clusters[c] = clusters[c] + [s] if c in clusters else [s]
+            counter += 1
+            progbar.progress_bar(counter, clust_count)
+    print('')
     return [Cluster(seq_ids=v, mrdb=mr_db) for v in clusters.values()]
 
 
