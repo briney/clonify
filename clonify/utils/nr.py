@@ -22,7 +22,7 @@
 #
 
 
-from __future__ import print_function
+
 
 import json
 import os
@@ -84,7 +84,7 @@ def fill_lookup_db(lookup_db, seqs):
 
 
 def chunker(l, size=900):
-	return (l[pos:pos + size] for pos in xrange(0, len(l), size))
+	return (l[pos:pos + size] for pos in range(0, len(l), size))
 
 
 def json_lookup(seq_ids, lookup_db):
@@ -206,7 +206,7 @@ def expand_clusters(nr_clusters, nr_db):
 	print('Expanding non-redundant sequences...', end='')
 	sys.stdout.flush()
 	clusters = {}
-	for cluster_id in nr_clusters.keys():
+	for cluster_id in list(nr_clusters.keys()):
 		cluster_seq_ids = nr_clusters[cluster_id]
 		expanded_ids = expand_nr_seqs(cluster_seq_ids, nr_db)
 		clusters[cluster_id] = expanded_ids

@@ -31,10 +31,10 @@ import string
 import subprocess as sp
 import tempfile
 
-from database import Database
+from .database import Database
 
-from abtools.cluster import cluster
-from abtools.utils import progbar
+from abutils.utils.cluster import cluster
+from abutils.utils import progbar
 
 
 
@@ -107,7 +107,7 @@ class Clusters(object):
                 reduced_clusters[n].add(i)
             else:
                 reduced_clusters[n] = ReducedCluster(i)
-        clusters = reduced_clusters.values()
+        clusters = list(reduced_clusters.values())
         print('Getting reduced cluster sequence IDs...')
         progbar.progress_bar(0, len(clusters))
         for i, c in enumerate(clusters):
@@ -260,7 +260,7 @@ class Cluster(object):
         if self._v_gene is None:
             vgenes = [s['v_gene']['full'].split('*')[0] for s in self.sequences]
             vcounts = collections.Counter(vgenes)
-            self._v_gene = sorted(vcounts.keys(), key=lambda x: vcounts[x], reverse=True)[0]
+            self._v_gene = sorted(list(vcounts.keys()), key=lambda x: vcounts[x], reverse=True)[0]
         return self._v_gene
 
     @property
@@ -268,7 +268,7 @@ class Cluster(object):
         if self._cdr3_len is None:
             lengths = [len(s['junc_aa']) - 2 for s in self.sequences]
             lcounts = collections.Counter(lengths)
-            self._cdr3_len = sorted(lcounts.keys(), key=lambda x: lcounts[x], reverse=True)[0]
+            self._cdr3_len = sorted(list(lcounts.keys()), key=lambda x: lcounts[x], reverse=True)[0]
         return self._cdr3_len
 
 
@@ -412,7 +412,7 @@ def get_clusters_from_file(cluster_file, mr_db=None):
         for line in f:
             s, c = line.strip().split()
             clusters[c] = clusters[c] + [s] if c in clusters else [s]
-    return [Cluster(seq_ids=v, mrdb=mr_db) for v in clusters.values()]
+    return [Cluster(seq_ids=v, mrdb=mr_db) for v in list(clusters.values())]
 
 
 

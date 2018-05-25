@@ -22,10 +22,17 @@
 #
 
 
-import cPickle as pickle
 import os
 import sqlite3
+import sys
 import time
+
+if sys.version_info[0] > 2:
+    STR_TYPES = [str, ]
+    import pickle
+else:
+    STR_TYPES = [str, unicode]
+    import cPickle as pickle
 
 
 class Database(object):
@@ -168,7 +175,7 @@ class Database(object):
 
         Returns: a list of unpickled values
         '''
-        if type(keys) in [str, unicode]:
+        if type(keys) in STR_TYPES:
             keys = [keys, ]
         results = []
         for chunk in self.chunker(keys):
@@ -189,7 +196,7 @@ class Database(object):
 
         Returns: a list of unpickled values
         '''
-        if type(keys) in [str, unicode]:
+        if type(keys) in STR_TYPES:
             keys = [keys, ]
         results = self.cursor.execute(
             '''SELECT seqs.value
@@ -198,7 +205,7 @@ class Database(object):
 
 
     def delete(self, keys):
-        if type(keys) in [str, unicode]:
+        if type(keys) in STR_TYPES:
             keys = [keys, ]
         with self.connection as conn:
             conn.executemany(
@@ -225,5 +232,5 @@ class Database(object):
         '''
         Yields successive n-sized chunks from l.
         '''
-        for i in xrange(0, len(l), n):
+        for i in range(0, len(l), n):
             yield l[i:i + n]

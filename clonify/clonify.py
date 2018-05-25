@@ -22,12 +22,11 @@
 #
 
 
-from __future__ import print_function
+
 
 import argparse
 import celery
 from collections import OrderedDict
-import cPickle as pickle
 import json
 import math
 import multiprocessing as mp
@@ -38,16 +37,20 @@ import sys
 import tempfile
 import time
 import traceback
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
-from abtools import log, mongodb
-from abtools.pipeline import make_dir
-from abtools.queue.celery import celery
-from abtools.utils import progbar
+from abutils.utils import log, mongodb, progbar
+from abutils.utils.pipeline import make_dir
+from abutils.utils.queue.celery import celery
 
-from utils import cluster
-from utils.cluster import Cluster, Clusters
-from utils.database import Database
+from .utils import cluster
+from .utils.cluster import Cluster, Clusters
+from .utils.database import Database
+
+if sys.version_info[0] > 2:
+    import pickle
+else:
+    import cPickle as pickle
 
 
 
@@ -268,7 +271,7 @@ def update(clust, group):
 def get_sequences(collection_group, args):
     seqs = []
     if args.non_redundant:
-        from utils import nr
+        from .utils import nr
         nr_db = nr.make_nr_seq_db(args)
         for collection in collection_group:
             print_collection_info(collection)
@@ -322,7 +325,7 @@ def build_mr_db(sequences, args):
 
 
 def chunker(l, size=900):
-    return (l[pos:pos + size] for pos in xrange(0, len(l), size))
+    return (l[pos:pos + size] for pos in range(0, len(l), size))
 
 
 ################################
@@ -733,7 +736,7 @@ def main(args):
             app = celery.Celery()
             app.config_from_object('abtools.celeryconfig')
             stats = app.control.inspect().stats()
-            cores = sum([v['pool']["max-concurrency"] for v in stats.values()])
+            cores = sum([v['pool']["max-concurrency"] for v in list(stats.values())])
         else:
             cores = mp.cpu_count()
         logger.debug('CORES: {}'.format(cores))
