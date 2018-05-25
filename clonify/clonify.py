@@ -41,7 +41,7 @@ import urllib.request, urllib.parse, urllib.error
 
 from abutils.utils import log, mongodb, progbar
 from abutils.utils.pipeline import make_dir
-from abutils.utils.queue.celery import celery
+from abtools.queue.celery import celery
 
 from .utils import cluster
 from .utils.cluster import Cluster, Clusters
