@@ -163,7 +163,7 @@ class Database(object):
             '''SELECT seqs.key, seqs.value
                FROM seqs
                WHERE seqs.key LIKE ?''', (key, ))
-        return pickle.loads(str(self.cursor.fetchone()[1]))
+        return pickle.loads(self.cursor.fetchone()[1])
 
 
     def find(self, keys):
@@ -184,7 +184,7 @@ class Database(object):
                    FROM seqs
                    WHERE seqs.key IN ({})'''.format(','.join('?' * len(chunk))), chunk)
             results.extend(result_chunk)
-        return [pickle.loads(str(r[1])) for r in results]
+        return [pickle.loads(r[1]) for r in results]
 
 
     def find_all(self):
@@ -201,7 +201,7 @@ class Database(object):
         results = self.cursor.execute(
             '''SELECT seqs.value
                FROM seqs''')
-        return [pickle.loads(str(r[0])) for r in results]
+        return [pickle.loads(r[0]) for r in results]
 
 
     def delete(self, keys):
