@@ -151,7 +151,7 @@ def cdhit_clustering(seqs, args):
 
 
 def make_cdhit_input(seqs, args):
-	infile = tempfile.NamedTemporaryFile(dir=args.temp, delete=False)
+	infile = tempfile.NamedTemporaryFile(dir=args.temp, delete=False, mode='w')
 	fastas = []
 	for s in seqs:
 		seq_type = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'

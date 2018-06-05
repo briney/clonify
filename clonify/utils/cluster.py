@@ -348,7 +348,7 @@ class Cluster(object):
         json_string = '[\n  ' + ', \n  '.join(jsons) + '\n] \n'
         if as_file:
             temp_dir = temp_dir if temp_dir is not None else '/tmp'
-            jfile = tempfile.NamedTemporaryFile(dir=temp_dir, delete=False)
+            jfile = tempfile.NamedTemporaryFile(dir=temp_dir, delete=False, mode='w')
             jfile.write(json_string)
             jfile.close()
             return jfile.name
