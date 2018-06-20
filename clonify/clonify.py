@@ -586,7 +586,7 @@ def clonify_reduce(cluster_files, mr_db):
 
     # reduce
     print('Reducing clusters...')
-    reduced_clusters = clusters.reduce()
+    reduced_clusters = clusters.reduce(temp_dir=args.temp)
     return reduced_clusters
 
 

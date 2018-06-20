@@ -95,10 +95,15 @@ class Clusters(object):
         self.clusters += clusters
 
 
-    def reduce(self):
+    def reduce(self, temp_dir='/tmp'):
         print('Writing reduced input file...')
-        json_file = Cluster.pretty_json(self.centroids, as_file=True, id_field='name', show_progress=True)
+        json_file = Cluster.pretty_json(self.centroids,
+                                        as_file=True,
+                                        temp_dir=temp_dir,
+                                        id_field='name',
+                                        show_progress=True)
         seq_ids = [s['name'] for s in self.centroids]
+        print('Running Clonify...')
         cluster_ids = self.clonify(json_file)
         print('Reducing clusters')
         reduced_clusters = {}
