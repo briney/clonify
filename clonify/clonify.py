@@ -364,7 +364,7 @@ def clonify(json_files, mr_db, json_db, args):
     if args.num_map_workers == 1:
         return cluster.get_clusters_from_file(cluster_files[0], mr_db=mr_db)
     else:
-        reduced_clusters = clonify_reduce(cluster_files, mr_db)
+        reduced_clusters = clonify_reduce(cluster_files, mr_db, json_db, args)
         return reduced_clusters
 
 
@@ -560,7 +560,7 @@ def clonify_map(json_file, json_db, args):
 
 
 @celery.task
-def clonify_reduce(cluster_files, mr_db):
+def clonify_reduce(cluster_files, mr_db, json_db, args):
 
     '''
     Given a pair of cluster file names, merge their clusters.
