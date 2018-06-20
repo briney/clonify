@@ -96,8 +96,8 @@ class Clusters(object):
 
 
     def reduce(self):
-        print('Writing reduce input file...')
-        json_file = Cluster.pretty_json(self.centroids, as_file=True, id_field='name')
+        print('Writing reduced input file...')
+        json_file = Cluster.pretty_json(self.centroids, as_file=True, id_field='name', show_progress=True)
         seq_ids = [s['name'] for s in self.centroids]
         cluster_ids = self.clonify(json_file)
         print('Reducing clusters')
@@ -318,9 +318,11 @@ class Cluster(object):
 
 
     @staticmethod
-    def pretty_json(sequences, as_file=False, temp_dir=None, raw=False, id_field='seq_id'):
+    def pretty_json(sequences, as_file=False, temp_dir=None, raw=False, id_field='seq_id', show_progress=False):
         jsons = []
-        for s in sequences:
+        if show_progress:
+            progbar.progress_bar(0, len(sequences))
+        for i, s in enumerate(sequences, 1):
             if len(s['var_muts_nt']['muts']) == 0:
                 bases = ['A', 'C', 'G', 'T']
                 s['var_muts_nt']['num'] = 1
@@ -343,6 +345,10 @@ class Cluster(object):
                                           junc_aa=s['junc_aa'],
                                           mut_string=mut_string,
                                           mut_num=s['var_muts_nt']['num']))
+            if show_progress:
+                progbar.progress_bar(i, len(sequences))
+        if show_progress:
+            print('\n')
         if raw:
             return ', \n  '.join(jsons)
         json_string = '[\n  ' + ', \n  '.join(jsons) + '\n] \n'
