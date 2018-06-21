@@ -258,7 +258,8 @@ def update_db(clusters, group):
     update_threads = 25
     for i in range(0, len(clusters), update_threads):
         tlist = []
-        for c in clusters[i:i + update_threads]:
+        end = min(i + update_threads, len(clusters))
+        for c in clusters[i:end]:
             sizes.append(c.size)
             t = Thread(target=update, args=(c, group))
             t.start()
@@ -266,6 +267,7 @@ def update_db(clusters, group):
         for t in tlist:
             t.join()
         progbar.progress_bar(i + update_threads, len(clusters))
+    print('')
 
 
     # monitor_update(async_results)
