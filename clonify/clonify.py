@@ -25,7 +25,7 @@
 
 
 import argparse
-import celery
+# import celery
 from collections import OrderedDict
 import json
 import math
@@ -41,7 +41,7 @@ import urllib.request, urllib.parse, urllib.error
 
 from abutils.utils import log, mongodb, progbar
 from abutils.utils.pipeline import make_dir
-from abtools.queue.celery import celery
+# from abtools.queue.celery import celery
 
 from .utils import cluster
 from .utils.cluster import Cluster, Clusters
@@ -509,7 +509,7 @@ def get_iteration_count(starting_file_count):
             return i
 
 
-@celery.task
+# @celery.task
 def clonify_map(json_file, json_db, args):
     '''
     Runs clonify on the sequences contained in a JSON file.
@@ -549,7 +549,7 @@ def clonify_map(json_file, json_db, args):
     return seq_cluster_file
 
 
-@celery.task
+# @celery.task
 def clonify_reduce(cluster_files, mr_db):
 
     '''
