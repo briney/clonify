@@ -246,14 +246,15 @@ def update_db(clusters, group):
     print_update_info()
     start = time.time()
     sizes = []
-    p = mp.Pool(processes=250)
-    async_results = []
+    # p = mp.Pool(processes=250)
+    # async_results = []
     for c in clusters:
         sizes.append(c.size)
-        async_results.append(p.apply_async(update, args=(c, group)))
-    monitor_update(async_results)
-    p.close()
-    p.join()
+        # async_results.append(p.apply_async(update, args=(c, group)))
+        update(c, group)
+    # monitor_update(async_results)
+    # p.close()
+    # p.join()
     seq_count = sum(sizes)
     run_time = time.time() - start
     logger.info('Updating took {} seconds. ({} sequences per second)'.format(round(run_time, 2), round(seq_count / run_time, 1)))
