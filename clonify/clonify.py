@@ -258,7 +258,7 @@ def update_db(clusters, group):
     update_threads = 25
     for i in range(0, len(clusters), update_threads):
         tlist = []
-        end = min(i + update_threads, len(clusters))
+        end = min([i + update_threads, len(clusters)])
         for c in clusters[i:end]:
             sizes.append(c.size)
             t = Thread(target=update, args=(c, group))
