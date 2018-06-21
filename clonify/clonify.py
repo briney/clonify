@@ -256,16 +256,16 @@ def update_db(clusters, group):
     
     progbar.progress_bar(0, len(clusters))
     update_threads = 25
-    for g in range(0, len(clusters), update_threads):
+    for i in range(0, len(clusters), update_threads):
         tlist = []
-        for c in clusters[g:g + update_threads]:
+        for c in clusters[i:i + update_threads]:
             sizes.append(c.size)
             t = Thread(target=update, args=(c, group))
             t.start()
             tlist.append(t)
         for t in tlist:
             t.join()
-        progbar.progress_bar(g + update_threads, len(groups))
+        progbar.progress_bar(i + update_threads, len(clusters))
 
 
     # monitor_update(async_results)
