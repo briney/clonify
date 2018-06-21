@@ -795,6 +795,7 @@ def main(args):
             name = collection_group if len(collection_group) == 1 else str(i)
             write_output(clusters, mr_db, args, collection_group=name)
         if args.update:
+            ensure_index('seq_id', collection_group)
             cluster_sizes = update_db(clusters, collection_group)
         else:
             cluster_sizes = [c.size for c in clusters]
