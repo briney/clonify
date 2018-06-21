@@ -263,8 +263,17 @@ def update_db(clusters, group):
 def update(clust, group):
     for collection in group:
         c = db[collection]
-        c.update_many({'seq_id': {'$in': clust.seq_ids}},
-                 {'$set': {'clonify': {'id': clust.name, 'size': clust.size}}})
+        update_result = c.update_many({'seq_id': {'$in': clust.seq_ids}},
+                                      {'$set': {'clonify': {'id': clust.name, 'size': clust.size}}})
+        try:
+            debug = [collection]
+            debug.append('matching records: {}'.format(update_result.matched_count))
+            debug.append('modified records: {}'.format(update_result.modified_count))
+            debug.append('cluster size: {}'.format(clust.size))
+            debug.append('')
+            print('\n'.join(debug))
+        except:
+            print(traceback.format_exc())
 
 
 def get_sequences(collection_group, args):
