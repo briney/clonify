@@ -605,7 +605,7 @@ def monitor_update(results):
 
 def update_progress(finished, jobs, iteration=None):
     pct = int(100. * finished / jobs)
-    ticks = pct / 2
+    ticks = int(pct / 2)
     spaces = 50 - ticks
     if iteration is not None:
         prog_bar = '\r({}/{}) |{}{}|  {}% (files left: {})'.format(finished, jobs, '|' * ticks, ' ' * spaces, pct, iteration)
