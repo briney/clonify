@@ -277,7 +277,7 @@ def update_db(clusters, group):
     return sizes
 
 
-def update(clusters, group):
+def update(clust, group):
     for collection in group:
         c = db[collection]
         update_result = c.update_many({'seq_id': {'$in': clust.seq_ids}},
