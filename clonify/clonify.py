@@ -266,7 +266,7 @@ def update_db(clusters, group):
             tlist.append(t)
         for t in tlist:
             t.join()
-        progbar.progress_bar(i + update_threads, len(clusters))
+        progbar.progress_bar(end, len(clusters))
     print('')
 
 
