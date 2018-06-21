@@ -255,7 +255,7 @@ def update_db(clusters, group):
     #     update(c, group)
     
     progbar.progress_bar(0, len(clusters))
-    update_threads = 25
+    update_threads = 250
     for i in range(0, len(clusters), update_threads):
         tlist = []
         end = min([i + update_threads, len(clusters)])
