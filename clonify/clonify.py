@@ -35,6 +35,7 @@ import sqlite3
 import subprocess as sp
 import sys
 import tempfile
+from threading import Thread
 import time
 import traceback
 import urllib.request, urllib.parse, urllib.error
@@ -248,10 +249,25 @@ def update_db(clusters, group):
     sizes = []
     # p = mp.Pool(processes=250)
     # async_results = []
-    for c in clusters:
-        sizes.append(c.size)
-        # async_results.append(p.apply_async(update, args=(c, group)))
-        update(c, group)
+    # for c in clusters:
+    #     sizes.append(c.size)
+    #     # async_results.append(p.apply_async(update, args=(c, group)))
+    #     update(c, group)
+    
+    progbar.progress_bar(0, len(clusters))
+    update_threads = 25
+    for g in range(0, len(clusters), update_threads):
+        tlist = []
+        for c in clusters[g:g + update_threads]:
+            sizes.append(c.size)
+            t = Thread(target=update, args=(c, group))
+            t.start()
+            tlist.append(t)
+        for t in tlist:
+            t.join()
+        progbar.progress_bar(g + update_threads, len(groups))
+
+
     # monitor_update(async_results)
     # p.close()
     # p.join()
@@ -261,20 +277,20 @@ def update_db(clusters, group):
     return sizes
 
 
-def update(clust, group):
+def update(clusters, group):
     for collection in group:
         c = db[collection]
         update_result = c.update_many({'seq_id': {'$in': clust.seq_ids}},
                                       {'$set': {'clonify': {'id': clust.name, 'size': clust.size}}})
-        try:
-            debug = [collection]
-            debug.append('matching records: {}'.format(update_result.matched_count))
-            debug.append('modified records: {}'.format(update_result.modified_count))
-            debug.append('cluster size: {}'.format(clust.size))
-            debug.append('')
-            print('\n'.join(debug))
-        except:
-            print(traceback.format_exc())
+        # try:
+        #     debug = [collection]
+        #     debug.append('matching records: {}'.format(update_result.matched_count))
+        #     debug.append('modified records: {}'.format(update_result.modified_count))
+        #     debug.append('cluster size: {}'.format(clust.size))
+        #     debug.append('')
+        #     print('\n'.join(debug))
+        # except:
+        #     print(traceback.format_exc())
 
 
 def get_sequences(collection_group, args):
