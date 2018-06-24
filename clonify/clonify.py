@@ -45,6 +45,7 @@ from abutils.utils.pipeline import make_dir
 # from abtools.queue.celery import celery
 
 from .utils import cluster
+from .utils.nr import expand_nr_seqs
 from .utils.cluster import Cluster, Clusters
 from .utils.database import Database
 
@@ -260,6 +261,10 @@ def update_db(clusters, group):
         tlist = []
         end = min([i + update_threads, len(clusters)])
         for c in clusters[i:end]:
+            # if non_redundant:
+            #     seq_ids = expand_nr_seqs(c.seq_ids)
+            # else:
+            #     seq_ids = c.seq_ids
             sizes.append(c.size)
             t = Thread(target=update, args=(c, group))
             t.start()
@@ -307,12 +312,13 @@ def get_sequences(collection_group, args):
             seqs += nr_coll_seqs
             print_query_info(coll_seqs, nr=nr_coll_seqs)
     else:
+        nr_db = None
         for collection in collection_group:
             print_collection_info(collection)
             coll_seqs = query(collection, args)
             seqs += coll_seqs
             print_query_info(coll_seqs)
-    return seqs
+    return seqs, nr_db
 
 
 ################################
@@ -749,7 +755,7 @@ def main(args):
 
     for i, collection_group in enumerate(collection_groups):
         print_collection_group_info(collection_group, i)
-        seqs = get_sequences(collection_group, args)
+        seqs, nr_db = get_sequences(collection_group, args)
         seq_count = len(seqs)
         mr_db = build_mr_db(seqs, args)
         if len(seqs) == 0:
@@ -788,6 +794,13 @@ def main(args):
         #     clusters = clonify(json_files, mr_db, json_db, args)
         print_clonify_input_building(seq_count)
         clusters = clonify(json_files, mr_db, json_db, args)
+
+        if args.non_redundant:
+            print('Expanding clusters...')
+            for c in clusters:
+                expanded_seq_ids = expand_nr_seqs(clust.seq_ids, nr_db)
+                c.seq_ids = expanded_seq_ids
+                c.size = len(expanded_seq_ids)
 
 
         if args.output:
