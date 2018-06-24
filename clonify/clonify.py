@@ -798,7 +798,7 @@ def main(args):
         if args.non_redundant:
             print('Expanding clusters...')
             for c in clusters:
-                expanded_seq_ids = expand_nr_seqs(clust.seq_ids, nr_db)
+                expanded_seq_ids = expand_nr_seqs(c.seq_ids, nr_db)
                 c.seq_ids = expanded_seq_ids
                 c.size = len(expanded_seq_ids)
 
