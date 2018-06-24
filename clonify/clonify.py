@@ -45,7 +45,7 @@ from abutils.utils.pipeline import make_dir
 # from abtools.queue.celery import celery
 
 from .utils import cluster
-from .utils.nr import expand_nr_seqs
+from .utils.nr import expand_nr_seqs, index_nr_db
 from .utils.cluster import Cluster, Clusters
 from .utils.database import Database
 
@@ -796,12 +796,16 @@ def main(args):
         clusters = clonify(json_files, mr_db, json_db, args)
 
         if args.non_redundant:
+            print('\nIndexing non-redundant sequence database...')
+            index_nr_db(nr_db)
             print('Expanding clusters...')
-            for c in clusters:
+            progbar.progress_bar(0, len(clusters))
+            for i, c in enumerate(clusters, 1):
                 expanded_seq_ids = expand_nr_seqs(c.seq_ids, nr_db)
                 c.seq_ids = expanded_seq_ids
                 c.size = len(expanded_seq_ids)
-
+                progbar.progress_bar(i, len(clusters))
+            print('\n')
 
         if args.output:
             print_output(args)
