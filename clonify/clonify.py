@@ -53,7 +53,7 @@ from abutils.utils.jobs import monitor_mp_jobs
 from abutils.utils.pipeline import list_files, make_dir
 # from abtools.queue.celery import celery
 
-from .utils import lineage
+from .utils.lineage import Lineages, Lineage
 # from .utils.nr import expand_nr_seqs, index_nr_db
 # from .utils.cluster import Cluster, Clusters
 from .utils.database import ClonifyDB
@@ -344,7 +344,7 @@ def update_json(lineage_files, group, args):
     ldict = {}
     sdict = {}
     for lf in lineage_files:
-        l = lineage.Lineage(lineage_file=lf)
+        l = Lineage(lineage_file=lf)
         for seq_id in l.seq_ids:
             ldict[seq_id] = l.id
             sdict[seq_id] = l.size            
@@ -440,7 +440,7 @@ def update_mongodb(lineage_files, group, args):
         tlist = []
         end = min([i + update_threads, len(lineage_files)])
         for lf in lineage_files[i:end]:
-            l = lineage.Lineage(lineage_file=lf)
+            l = Lineage(lineage_file=lf)
             t = Thread(target=mongoupdate, args=(db, l, group))
             t.start()
             tlist.append(t)
@@ -482,7 +482,7 @@ def update_sequences(lineage_files, args):
     ldict = {}
     sdict = {}
     for lf in lineage_files:
-        l = lineage.Lineage(lineage_file=lf)
+        l = Lineage(lineage_file=lf)
         for seq_id in l.seq_ids:
             ldict[seq_id] = l.id
             sdict[seq_id] = l.size            
@@ -682,7 +682,7 @@ def run_clonify(seq_file, lineage_dir, args):
     stdout, stderr = p.communicate()
     logger.debug(stdout.strip())
     logger.debug(stderr)
-    lineages = lineage.Lineages(seq_ids, cluster_file)
+    lineages = Lineages(seq_ids, cluster_file)
     sizes = []
     lineage_files = []
     for lineage in lineages:
@@ -709,7 +709,7 @@ def write_clonify_output(lineage_files, clonify_db, group_id, args):
     ofile = os.path.join(args.output, 'group_{}'.format(group_id))
     with open(ofile, 'w') as f:
         for lf in lineage_files:
-            l = lineage.Lineage(lineage_file=lf)
+            l = Lineage(lineage_file=lf)
             seqs = clonify_db.get_sequences_by_id(l.seq_ids)
             fstring = '\n'.join(['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in seqs])
             f.write(fstring + '\n')
