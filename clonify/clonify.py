@@ -120,11 +120,11 @@ def parse_args():
     # parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
     #                     help="NOT YET IMPLEMENTED. The cutoff adjusted edit distance (aED) for segregating \
     #                     sequences into clonal families. Defaults to 0.35.")
-    # parser.add_argument('-C', '--celery', dest="celery", default=False, action='store_true',
-    #                     help="NOT YET IMPLEMENTED. Use if performing computation on a Celery cluster. \
-    #                     If set, input files will be split into many subfiles and passed \
-    #                     to a Celery queue. If not set, input files will still be split, but \
-    #                     will be distributed to local processors using multiprocessing.")
+    parser.add_argument('-C', '--celery', dest="celery", default=False, action='store_true',
+                        help="NOT YET IMPLEMENTED. Use if performing computation on a Celery cluster. \
+                        If set, input files will be split into many subfiles and passed \
+                        to a Celery queue. If not set, input files will still be split, but \
+                        will be distributed to local processors using multiprocessing.")
     # parser.add_argument('-w', '--num-map-workers', dest='num_map_workers', type=int, default=1,
     #                     help='The number of map process that will be spawned. Default is 1. \
     #                     Set to 0 to use the max number of available cores, whether on a local \
@@ -170,7 +170,7 @@ class Args(object):
         self.clustering_threshold = clustering_threshold
         self.clustering_memory_allocation = int(clustering_memory_allocation)
         # self.distance_cutoff = float(distance_cutoff)
-        # self.celery = celery
+        self.celery = celery
         self.update = update
         self.debug = debug
 
