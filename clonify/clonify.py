@@ -579,10 +579,15 @@ def cluster_vj_groups(groups, clonify_db, args):
     make_dir(cluster_dir)
     cluster_temp = os.path.join(args.temp, 'clustering_temp')
     make_dir(cluster_temp)
+
+
+    print(groups)
+
+
     for group in groups:
         v, j = os.path.basename(group).split('_')
         clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True,
-                           make_db=False, max_memory=args.clustering_memory_allocation)
+                           make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
         for i, id_list in enumerate(clusters):
             cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, i))
             seqs = clonify_db.get_sequences_by_id(id_list)
