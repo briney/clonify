@@ -997,7 +997,7 @@ def print_start_info(groups, args):
     logger.info('')
     logger.info('The following groups of {} will be processed:'.format(gtype))
     for group in groups:
-        logger.info(', '.join(group)
+        logger.info(', '.join(group))
     # if args.non_redundant:
     #     logger.info('\nIdentical sequences from each collection will be collapsed before lineage assignment.')
     if not args.output:
