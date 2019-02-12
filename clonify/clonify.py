@@ -581,11 +581,6 @@ def cluster_vj_groups(groups, clonify_db, args):
     make_dir(cluster_dir)
     cluster_temp = os.path.join(args.temp, 'clustering_temp')
     make_dir(cluster_temp)
-
-
-    print(groups)
-
-
     start = datetime.now()
     for i, group in enumerate(groups):
         v, j = os.path.basename(group).split('_')
@@ -1065,7 +1060,7 @@ def print_clonify_input_building(seq_count):
 
 
 def print_clonify_start():
-    logger.info('\nRunning Clonify...')
+    # logger.info('\nRunning Clonify...')
     sys.stdout.flush()
 
 
@@ -1135,6 +1130,16 @@ def print_group_info(group, num, num_groups, args):
 
 
 def print_clonify_results(seq_count, lineage_sizes):
+
+
+
+
+    print(lineage_sizes)
+    
+    
+    
+    
+    
     gt1_sizes = [l for l in lineage_sizes if l > 1] 
     lineage_count = len(gt1_sizes)
     mean = np.mean(gt1_sizes)
