@@ -135,7 +135,9 @@ def parse_args():
                         help='Tests whether the cluster program works. Useful for troubleshooting.')
     parser.add_argument('-D', '--debug', dest='debug', action='store_true', default=False,
                         help="If set, will run in debug mode.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    args_dict = vars(args)
+    return Args(**args_dict)
 
 
 class Args(object):
