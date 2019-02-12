@@ -991,8 +991,8 @@ def update_progress(finished, jobs, iteration=None):
 def print_start_info(coll_groups, args):
     logger.info('\nThe following groups of collections will be processed:')
     logger.info('\n'.join([', '.join(c) for c in coll_groups]))
-    if args.non_redundant:
-        logger.info('\nIdentical sequences from each collection will be collapsed before lineage assignment.')
+    # if args.non_redundant:
+    #     logger.info('\nIdentical sequences from each collection will be collapsed before lineage assignment.')
     if not args.output:
         logger.info('\nWARNING: No output directory given so no output will be written.')
     if not args.update:
