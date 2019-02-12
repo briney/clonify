@@ -102,7 +102,7 @@ def parse_args():
     parser.add_argument('-t', '--temp', dest='temp', default='/tmp',
                         help="The directory in which temp files will be stored. \
                         If the directory doesn't exist, it will be created. Default is '/tmp'.")
-    parser.add_argument('-l', '--log', dest='logfile',
+    parser.add_argument('-l', '--log', dest='logfile', default=None,
                         help="Path to the log file. Required.")
     # parser.add_argument('--non-redundant', default=False,
     #                     help="Collapses identical sequences prior to running Clonify. \
@@ -165,7 +165,7 @@ class Args(object):
         self.password = password
         self.output = output
         self.temp = temp
-        self.logfile = log
+        self.logfile = logfile
         # self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
         self.clustering_memory_allocation = int(clustering_memory_allocation)
