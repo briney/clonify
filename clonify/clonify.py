@@ -33,6 +33,7 @@ import json
 import math
 import multiprocessing as mp
 import os
+import shutil
 import sqlite3
 import subprocess as sp
 import sys
@@ -44,11 +45,11 @@ import urllib.request, urllib.parse, urllib.error
 
 import numpy as np
 
+from abutils.core.sequence import Sequence
 from abutils.utils import log, mongodb, progbar
 from abutils.utils.cluster import cluster
 from abutils.utils.inputs import read_input
 from abutils.utils.pipeline import list_files, make_dir
-from abutils.utils.sequence import Sequence
 # from abtools.queue.celery import celery
 
 from .utils import lineage
@@ -437,7 +438,6 @@ def update_mongodb(lineage_files, group, args):
         end = min([i + update_threads, len(lineage_files)])
         for lf in lineage_files[i:end]:
             l = lineage.Lineage(lineage_file=lf)
-            sizes.append(l.size)
             t = Thread(target=mongoupdate, args=(db, l, group))
             t.start()
             tlist.append(t)
@@ -451,6 +451,16 @@ def mongoupdate(db, lineage, group):
         c = db[collection]
         update_result = c.update_many({'seq_id': {'$in': lineage.seq_ids}},
                                       {'$set': {'clonify': {'id': lineage.id, 'size': lineage.size}}})
+        try:
+            debug = ['MONGODB UPDATE RESULTS', 'Group contents:']
+            debug += group
+            debug.append('matching records: {}'.format(update_result.matched_count))
+            debug.append('modified records: {}'.format(update_result.modified_count))
+            debug.append('lineage size: {}'.format(lineage.size))
+            debug.append('')
+            logger.debug('\n'.join(debug))
+        except:
+            logger.debug(traceback.format_exc())
 
 
 
@@ -504,39 +514,6 @@ def build_clonify_db(sequences, args):
     return clonifydb
 
 
-def build_json_db(seq_ids, json_files, args):
-    logger.info('')
-    logger.info('Building a database of JSON files...')
-    jsondb = Database('json_db', args.temp)
-    jsondb.insert_many(list(zip(json_files, seq_ids)))
-    # for j, s in zip(json_files, seq_ids):
-    #     jsondb[j] = s
-    jsondb.commit()
-    logger.info('Indexing...')
-    jsondb.index()
-    jsondb.close()
-    return jsondb
-
-
-def build_mr_db(sequences, args):
-    logger.info('')
-    logger.info('Building a database of sequences...')
-    # hackety hackerson to pickle the JSON data into a SQLite db, but
-    # since the db is just for rapid lookup of the JSON data by seq_id,
-    # I'm OK with it.
-    mrdb = Database('mr_db', args.temp)
-    seqs = [(s['seq_id'], s) for s in sequences]
-    mrdb.insert_many(seqs)
-    logger.info('Indexing...')
-    mrdb.index()
-    mrdb.close()
-    return mrdb
-
-
-def chunker(l, size=900):
-    return (l[pos:pos + size] for pos in range(0, len(l), size))
-
-
 def group_by_vj(clonify_db, args):
     logger.info('')
     logger.info('Grouping sequences by V/J gene use...')
@@ -558,7 +535,7 @@ def group_by_vj(clonify_db, args):
                 f.write('>{}\n{}\n'.format(s[0], s[1]))
         count += 1
     progbar.progress_bar(total, total, start_time=start, completion_string='\n', complete=True, extra_info=' ' * 15)
-    return list_files(grouping_dir)
+    return grouping_dir
 
 
 
@@ -593,12 +570,13 @@ def cluster_vj_groups(groups, clonify_db, args):
     ## TODO: make this work with Celery/multiprocessing, will need to limit clustering to a single thread,
     ## and may not produce massive speedups as large datasets clustered with a single thread may result in
     ## overall speed decreases
+    ## Also, we remove the clustering_temp directory upon completion, which shouldn't be done if this
+    ## function is going to be parallelized with Celery/multiprocessing
 
     cluster_dir = os.path.join(args.temp_dir, 'vj_clusters')
     make_dir(cluster_dir)
     cluster_temp = os.path.join(args.temp_dir, 'clustering_temp')
     make_dir(cluster_temp)
-    cluster_files = []
     for group in groups:
         v, j = os.path.basename(group).split('_')
         clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True,
@@ -608,10 +586,9 @@ def cluster_vj_groups(groups, clonify_db, args):
             seqs = clonify_db.get_sequences_by_id(id_list)
             with open(cluster_file, 'wb') as f:
                 pickle.dump(seqs, f, protocol=2)
-            cluster_files.append(cluster_file)
-        if not args.debug:
-            os.unlink(group)
-    return cluster_files
+    if not args.debug:
+        shutil.rmtree(cluster_temp)
+    return cluster_dir
 
 
 def clonify(seq_files, lineage_dir, args):
@@ -713,7 +690,15 @@ def update_clonify_info(lineage_files, group, args):
         update_sequences(lineage_files, args)
 
 
-
+def write_clonify_output(lineage_files, clonify_db, group_id, args):
+    make_dir(args.output)
+    ofile = os.path.join(args.output, 'group_{}'.format(group_id))
+    with open(ofile, 'w') as f:
+        for lf in lineage_files:
+            l = lineage.Lineage(lineage_file=lf)
+            seqs = clonify_db.get_sequences_by_id(l.seq_ids)
+            fstring = '\n'.join(['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in seqs])
+            f.write(fstring + '\n')
 
 
 
@@ -1176,9 +1161,11 @@ def main(args):
         logger.info('  PRE-CLUSTERING  ')
         logger.info('------------------')
         logger.info('Grouping sequences by V/J gene...')
-        vj_group_files = group_by_vj(clonify_db, args)
+        vj_group_dir = group_by_vj(clonify_db, args)
+        vj_group_files = list_files(vj_group_dir)
         logger.info('Clustering sequences within each VJ group...')
-        cluster_files = cluster_vj_groups(vj_group_files, clonify_db, args)
+        cluster_dir = cluster_vj_groups(vj_group_files, clonify_db, args)
+        cluster_files = list_files(cluster_dir)
         logger.info('')
 
         logger.info('-----------')
@@ -1187,104 +1174,121 @@ def main(args):
         logger.info('Running Clonify...')
         lineage_files, lineage_sizes = clonify(cluster_files, lineage_dir, args)
         print_clonify_results(seq_count, lineage_sizes)
+        logger.info('')
 
         logger.info('----------')
         logger.info('  UPDATE  ')
         logger.info('----------')
         update_clonify_info(lineage_files, group, args)
-
-
-
         logger.info('')
         
-        
-        
-        
-        
-        logger.info('Cleaning up...')
-        clonify_db.destroy()
-    
-
-
-
-
-
-
-
-
-
-
-    #==============  OLD  ===============#
-    
-    global db
-    db = mongodb.get_db(args.db, args.ip, args.port, args.user, args.password)
-    collection_groups = get_collection_groups(args)
-    print_start_info(collection_groups, args)
-
-    for i, collection_group in enumerate(collection_groups):
-        print_collection_group_info(collection_group, i)
-        seqs, nr_db = get_sequences(collection_group, args)
-        seq_count = len(seqs)
-        mr_db = build_mr_db(seqs, args)
-        if len(seqs) == 0:
-            continue
-
-        # Get the number of cores -- if multiprocessing, just mp.cpu_count();
-        # if Celery, need to get the number of worker processes
-        if args.num_map_workers > 0:
-            cores = args.num_map_workers
-        elif args.celery:
-            app = celery.Celery()
-            app.config_from_object('abtools.celeryconfig')
-            stats = app.control.inspect().stats()
-            cores = sum([v['pool']["max-concurrency"] for v in list(stats.values())])
-        else:
-            cores = mp.cpu_count()
-        logger.debug('CORES: {}'.format(cores))
-
-        # Divide the input sequences into JSON subfiles
-        chunksize = int(math.ceil(float(len(seqs)) / cores))
-        logger.debug('CHUNKSIZE: {}'.format(chunksize))
-        json_files = []
-        seq_ids = []
-        for seq_chunk in chunker(seqs, chunksize):
-            seq_ids.append([s['seq_id'] for s in seq_chunk])
-            json_files.append(Cluster.pretty_json(seq_chunk,
-                as_file=True,
-                temp_dir=args.temp))
-        json_db = build_json_db(seq_ids, json_files, args)
-
-        # Run clonify jobs via multiprocessing or Celery
-        # Should return a list of Cluster objects for each subfile
-        # if args.test_algo:
-        #     test_clonify_algorithm(json_files, mr_db, json_db, args)
-        # else:
-        #     clusters = clonify(json_files, mr_db, json_db, args)
-        print_clonify_input_building(seq_count)
-        clusters = clonify(json_files, mr_db, json_db, args)
-
-        if args.non_redundant:
-            print('\nIndexing non-redundant sequence database...')
-            index_nr_db(nr_db)
-            print('Expanding clusters...')
-            progbar.progress_bar(0, len(clusters))
-            for i, c in enumerate(clusters, 1):
-                expanded_seq_ids = expand_nr_seqs(c.seq_ids, nr_db)
-                c.seq_ids = expanded_seq_ids
-                c.size = len(expanded_seq_ids)
-                progbar.progress_bar(i, len(clusters))
-            print('\n')
-
-        if args.output:
-            print_output(args)
-            name = collection_group if len(collection_group) == 1 else str(i)
-            write_output(clusters, mr_db, args, collection_group=name)
         if args.update:
-            ensure_index('seq_id', collection_group)
-            cluster_sizes = update_db(clusters, collection_group)
+            logger.info('----------')
+            logger.info('  OUTPUT  ')
+            logger.info('----------')
+            write_clonify_output(lineage_files, clonify_db, i, args)
+            logger.info('')
+        
+        
+        logger.info('---------------')
+        logger.info('  CLEANING UP  ')
+        logger.info('---------------')
+        if not args.debug:
+            logger.info('Removing VJ group files...')
+            shutil.rmtree(vj_group_dir)
+            logger.info('Removing VJ cluster files...')
+            shutil.rmtree(cluster_dir)
+            logger.info('Removing lineage files...')
+            shutil.rmtree(lineage_dir)
+            logger.info('Removing ClonifyDB...')
+            clonify_db.destroy()
         else:
-            cluster_sizes = [c.size for c in clusters]
-        print_finished(cluster_sizes)
+            logger.info('Debug mode is ON, so temporary files are not removed.')
+    
+        logger.info('')
+        logger.info('')
+        logger.info('')
+
+
+
+
+
+
+
+
+
+
+    # #==============  OLD  ===============#
+    
+    # global db
+    # db = mongodb.get_db(args.db, args.ip, args.port, args.user, args.password)
+    # collection_groups = get_collection_groups(args)
+    # print_start_info(collection_groups, args)
+
+    # for i, collection_group in enumerate(collection_groups):
+    #     print_collection_group_info(collection_group, i)
+    #     seqs, nr_db = get_sequences(collection_group, args)
+    #     seq_count = len(seqs)
+    #     mr_db = build_mr_db(seqs, args)
+    #     if len(seqs) == 0:
+    #         continue
+
+    #     # Get the number of cores -- if multiprocessing, just mp.cpu_count();
+    #     # if Celery, need to get the number of worker processes
+    #     if args.num_map_workers > 0:
+    #         cores = args.num_map_workers
+    #     elif args.celery:
+    #         app = celery.Celery()
+    #         app.config_from_object('abtools.celeryconfig')
+    #         stats = app.control.inspect().stats()
+    #         cores = sum([v['pool']["max-concurrency"] for v in list(stats.values())])
+    #     else:
+    #         cores = mp.cpu_count()
+    #     logger.debug('CORES: {}'.format(cores))
+
+    #     # Divide the input sequences into JSON subfiles
+    #     chunksize = int(math.ceil(float(len(seqs)) / cores))
+    #     logger.debug('CHUNKSIZE: {}'.format(chunksize))
+    #     json_files = []
+    #     seq_ids = []
+    #     for seq_chunk in chunker(seqs, chunksize):
+    #         seq_ids.append([s['seq_id'] for s in seq_chunk])
+    #         json_files.append(Cluster.pretty_json(seq_chunk,
+    #             as_file=True,
+    #             temp_dir=args.temp))
+    #     json_db = build_json_db(seq_ids, json_files, args)
+
+    #     # Run clonify jobs via multiprocessing or Celery
+    #     # Should return a list of Cluster objects for each subfile
+    #     # if args.test_algo:
+    #     #     test_clonify_algorithm(json_files, mr_db, json_db, args)
+    #     # else:
+    #     #     clusters = clonify(json_files, mr_db, json_db, args)
+    #     print_clonify_input_building(seq_count)
+    #     clusters = clonify(json_files, mr_db, json_db, args)
+
+    #     if args.non_redundant:
+    #         print('\nIndexing non-redundant sequence database...')
+    #         index_nr_db(nr_db)
+    #         print('Expanding clusters...')
+    #         progbar.progress_bar(0, len(clusters))
+    #         for i, c in enumerate(clusters, 1):
+    #             expanded_seq_ids = expand_nr_seqs(c.seq_ids, nr_db)
+    #             c.seq_ids = expanded_seq_ids
+    #             c.size = len(expanded_seq_ids)
+    #             progbar.progress_bar(i, len(clusters))
+    #         print('\n')
+
+    #     if args.output:
+    #         print_output(args)
+    #         name = collection_group if len(collection_group) == 1 else str(i)
+    #         write_output(clusters, mr_db, args, collection_group=name)
+    #     if args.update:
+    #         ensure_index('seq_id', collection_group)
+    #         cluster_sizes = update_db(clusters, collection_group)
+    #     else:
+    #         cluster_sizes = [c.size for c in clusters]
+    #     print_finished(cluster_sizes)
 
 
 def run_standalone(args):
