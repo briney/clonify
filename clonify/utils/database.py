@@ -81,7 +81,7 @@ class ClonifyDB(SQLiteDatabase):
             conn.execute(self.insert_cmd, data)
 
 
-    def insert_many(self, sequences)
+    def insert_many(self, sequences):
         '''
         Inserts multiple entries.
 
