@@ -575,9 +575,9 @@ def cluster_vj_groups(groups, clonify_db, args):
     ## Also, we remove the clustering_temp directory upon completion, which shouldn't be done if this
     ## function is going to be parallelized with Celery/multiprocessing
 
-    cluster_dir = os.path.join(args.temp_dir, 'vj_clusters')
+    cluster_dir = os.path.join(args.temp, 'vj_clusters')
     make_dir(cluster_dir)
-    cluster_temp = os.path.join(args.temp_dir, 'clustering_temp')
+    cluster_temp = os.path.join(args.temp, 'clustering_temp')
     make_dir(cluster_temp)
     for group in groups:
         v, j = os.path.basename(group).split('_')
@@ -661,7 +661,7 @@ def run_clonify(seq_file, lineage_dir, args):
     with open(seq_file, 'rb') as f:
         seqs = pickle.load(f)
     seq_ids = [s['seq_id'] for s in seqs]
-    json_file = pretty_json(seqs, as_file=True, temp_dir=args.temp_dir)
+    json_file = pretty_json(seqs, as_file=True, temp_dir=args.temp)
     cluster_file = json_file + '_cluster'
     # need to name for the clonify C++ program, and should put it
     # in a location on my $PATH so that I can call it directly.
@@ -1140,7 +1140,7 @@ def main(args):
     num_groups = len(groups)
     print_start_info(groups, args)
 
-    lineage_dir = os.path.join(args.temp_dir, 'lineages')
+    lineage_dir = os.path.join(args.temp, 'lineages')
     make_dir(lineage_dir)
 
     for i, group in enumerate(groups, 1):
