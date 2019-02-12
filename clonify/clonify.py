@@ -1165,11 +1165,10 @@ def main(args):
         logger.info('----------------')
         logger.info('Getting sequences...')
         sequences = get_sequences(group, args)
-        # seq_count = len(sequences)
-        logger.info('Retrieved {} sequences'.format(seq_count))
         logger.info('Building a SQLite sequence database...')
         clonify_db = build_clonify_db(sequences, args)
         seq_count = clonify_db.count
+        logger.info('Retrieved {} sequences'.format(seq_count))
         logger.info('')
 
         logger.info('------------------')
