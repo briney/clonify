@@ -527,12 +527,13 @@ def group_by_vj(clonify_db, args):
     total = len(vs) * len(js)
     count = 0
     for v, j in itertools.product(vs, js):
-        progbar.progress_bar(0, total, start_time=start, extra_info='{}, {}    '.format(v, j))
+        progbar.progress_bar(count, total, start_time=start, extra_info='{}, {}    '.format(v, j))
+        seqs = clonify_db.get_cdr3s_for_vj_group(v, j)
+        if not seqs:
+            count += 1
+            continue
         gfile = os.path.join(grouping_dir, '{}_{}'.format(v, j))
-        if os.path.isfile(gfile):
-            os.unlink(gfile)
-        with open(gfile, 'a') as f:
-            seqs = clonify_db.get_cdr3s_for_vj_group(v, j)
+        with open(gfile, 'w') as f:
             for s in seqs:
                 f.write('>{}\n{}\n'.format(s[0], s[1]))
         count += 1
@@ -584,15 +585,17 @@ def cluster_vj_groups(groups, clonify_db, args):
     print(groups)
 
 
-    for group in groups:
+    for i, group in enumerate(groups):
         v, j = os.path.basename(group).split('_')
+        progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
         clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True,
                            make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
-        for i, id_list in enumerate(clusters):
-            cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, i))
+        for num, id_list in enumerate(clusters):
+            cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
             seqs = clonify_db.get_sequences_by_id(id_list)
             with open(cluster_file, 'wb') as f:
                 pickle.dump(seqs, f, protocol=2)
+    progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
     if not args.debug:
         shutil.rmtree(cluster_temp)
     return cluster_dir
