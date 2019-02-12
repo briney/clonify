@@ -49,6 +49,7 @@ from abutils.core.sequence import Sequence
 from abutils.utils import log, mongodb, progbar
 from abutils.utils.cluster import cluster
 from abutils.utils.inputs import read_input
+from abutils.utils.jobs import monitor_mp_jobs
 from abutils.utils.pipeline import list_files, make_dir
 # from abtools.queue.celery import celery
 
