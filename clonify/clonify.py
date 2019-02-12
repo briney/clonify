@@ -507,10 +507,10 @@ def build_clonify_db(sequences, args):
     clonifydb = ClonifyDB('clonify', args.temp)
     clonifydb.insert(sequences)
     clonifydb.commit()
-    logger.infp('Indexing...')
+    logger.info('Indexing...')
     logger.info('sequence id')
     clonifydb.index(fields='id')
-    logger.indo('vgene and jgene')
+    logger.info('vgene and jgene')
     clonifydb.index(fields=['vgene', 'jgene'])
     clonifydb.close()
     return clonifydb
