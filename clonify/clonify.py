@@ -145,7 +145,7 @@ class Args(object):
     def __init__(self, json=None, sequences=None, db=None, collection=None,
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
-        output='', temp=None, log=None, non_redundant=False, clustering_threshold=0.65,
+        output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65,
         clustering_memory_allocation=800, distance_cutoff=0.35, celery=False, update=True, debug=False):
         
         super(Args, self).__init__()
