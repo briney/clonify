@@ -146,7 +146,7 @@ class ClonifyDB(SQLiteDatabase):
         query_str = '''SELECT DISTINCT {0}.{1}
                        FROM {0}'''.format(self.table_name, field)
         results = self.cursor.execute(query_str)
-        return [r for r in results]
+        return [r[0] for r in results]
 
 
 

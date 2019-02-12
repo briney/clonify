@@ -517,8 +517,8 @@ def build_clonify_db(sequences, args):
 
 
 def group_by_vj(clonify_db, args):
-    logger.info('')
-    logger.info('Grouping sequences by V/J gene use...')
+    # logger.info('')
+    # logger.info('Grouping sequences by V/J gene use...')
     grouping_dir = os.path.join(args.temp, 'vj_groups')
     make_dir(grouping_dir)
     vs = clonify_db.find_distinct('vgene')
