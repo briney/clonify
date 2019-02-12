@@ -131,8 +131,8 @@ def parse_args():
     #                     machine using multiprocessing or on a Celery cluster.')
     parser.add_argument('-n', '--no_update', dest='update', action='store_false', default=True,
                         help="Use to skip updating the MongoDB database with clonality info.")
-    parser.add_argument('--test-algo', action='store_true', default=False,
-                        help='Tests whether the cluster program works. Useful for troubleshooting.')
+    # parser.add_argument('--test-algo', action='store_true', default=False,
+    #                     help='Tests whether the cluster program works. Useful for troubleshooting.')
     parser.add_argument('-D', '--debug', dest='debug', action='store_true', default=False,
                         help="If set, will run in debug mode.")
     args = parser.parse_args()
