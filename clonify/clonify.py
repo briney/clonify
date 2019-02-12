@@ -612,7 +612,7 @@ def clonify(seq_files, lineage_dir, args):
         logger.info('')
         logger.info('Running Clonify jobs via Celery...')
         sizes = run_clonify_via_celery(seq_files, lineage_dir, args)
-    elif any([args.debug, args.num_map_workers == 1]):
+    elif any([args.debug, ]):
         logger.info('')
         logger.info('Running Clonify...')
         sizes = run_clonify_singlethreaded(seq_files, lineage_dir, args)
