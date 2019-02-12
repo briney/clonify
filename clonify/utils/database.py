@@ -90,6 +90,11 @@ class ClonifyDB(SQLiteDatabase):
             data (list): Either a nested list of data fields (in order) or a list of dicts
                 with column/value mappings.
         '''
+
+        ## TODO: sequences might be a generator (huge) and we're consuming it to make the data list.
+        ## would be cool if making data was also a generator (feeding executemany) or did many 
+        ## execute operations without closing the transaction between them.
+
         data = []
         for s in sequences:
             d = [nested_dict_lookup(s, f) for f in self.fields]
