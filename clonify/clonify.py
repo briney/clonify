@@ -679,15 +679,15 @@ def run_clonify(seq_file, lineage_dir, args):
     logger.debug(stderr)
     lineages = Lineages(seq_ids, cluster_file)
     sizes = []
-    lineage_files = []
+    # lineage_files = []
     for lineage in lineages:
         sizes.append(lineage.size)
-        lineage_files.append(lineage.write(lineage_dir))
+        lineage.write(lineage_dir)
     # clean up
     if not args.debug:
         os.unlink(json_file)
         os.unlink(cluster_file)
-    return lineage_files, sizes
+    return sizes
 
 
 def update_clonify_info(lineage_files, group, args):
@@ -1203,7 +1203,8 @@ def main(args):
         logger.info('  CLONIFY  ')
         logger.info('-----------')
         logger.info('Running Clonify...')
-        lineage_files, lineage_sizes = clonify(cluster_files, lineage_dir, args)
+        lineage_dir, lineage_sizes = clonify(cluster_files, lineage_dir, args)
+        lineage_files = list_files(lineage_dir)
         print_clonify_results(seq_count, lineage_sizes)
         logger.info('')
 
