@@ -22,6 +22,7 @@
 #
 
 
+import os
 import random
 import string
 from uuid import uuid4
@@ -79,7 +80,7 @@ class Lineage():
         if seq_id is not None:
             self.seq_ids = [seq_id, ]
         elif lineage_file is not None:
-            self.seq_ids = _parse_lineage_file(lineage_file)
+            self.seq_ids = self._parse_lineage_file(lineage_file)
         else:
             self.seq_ids = []
     
@@ -114,7 +115,7 @@ class Lineage():
 
 
     def make_id(self):
-        self._id = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
 
 
     def _parse_lineage_file(self, lineage_file):
