@@ -1127,11 +1127,11 @@ def print_clonify_results(seq_count, lineage_sizes):
 def get_logfile(args):
     if args.logfile is None:
     	if args.output is None:
-    		return os.path.normpath('./{}.log'.format(args.db))
+    		return os.path.abspath('./{}.log'.format(args.db))
     	else:
-    		return os.path.normpath(os.path.join(args.output, './{}.log'.format(args.db)))
+    		return os.path.abspath(os.path.join(args.output, './{}.log'.format(args.db)))
     else:
-    	return os.path.normpath(args.logfile)
+    	return os.path.abspath(args.logfile)
 
 
 def main(args):
