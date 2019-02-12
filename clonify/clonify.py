@@ -223,7 +223,7 @@ def get_sequences(group, args):
                           query=QUERY, projection=PROJECTION)
     elif args.json is not None:
         seqs = read_input(group, 'json')
-    return seqs
+    return seqs.as_generator
 
 
 
@@ -988,19 +988,31 @@ def update_progress(finished, jobs, iteration=None):
     sys.stdout.flush()
 
 
-def print_start_info(coll_groups, args):
-    logger.info('\nThe following groups of collections will be processed:')
-    logger.info('\n'.join([', '.join(c) for c in coll_groups]))
+def print_start_info(groups, args):
+    gtype = 'sequences'
+    if args.db is not None:
+        gtype = 'MongoDB collections'
+    if args.json is not None:
+        gtype = 'json files'
+    logger.info('')
+    logger.info('The following groups of {} will be processed:'.format(gtype))
+    for group in groups:
+        logger.info(', '.join(group)
     # if args.non_redundant:
     #     logger.info('\nIdentical sequences from each collection will be collapsed before lineage assignment.')
     if not args.output:
-        logger.info('\nWARNING: No output directory given so no output will be written.')
+        logger.info('')
+        logger.info('WARNING: No output directory given so no output will be written.')
     if not args.update:
-        logger.info('\nWARNING: The MongoDB database will not be updated with clonality information.')
-    logger.info('\n\n')
-    logger.info('=' * 32)
-    logger.info('     PROCESSING COLLECTIONS')
-    logger.info('=' * 32)
+        logger.info('')
+        logger.info('WARNING: The MongoDB database will not be updated with clonality information.')
+    logger.info('')
+    logger.info('')
+    header = '    PROCESSING {}    '.format(gtype.upper())
+    logger.info('=' * len(header))
+    logger.info(header)
+    logger.info('=' * len(header))
+    logger.info('')
 
 
 def print_collection_info(collection):
@@ -1153,10 +1165,11 @@ def main(args):
         logger.info('----------------')
         logger.info('Getting sequences...')
         sequences = get_sequences(group, args)
-        seq_count = len(sequences)
+        # seq_count = len(sequences)
         logger.info('Retrieved {} sequences'.format(seq_count))
         logger.info('Building a SQLite sequence database...')
         clonify_db = build_clonify_db(sequences, args)
+        seq_count = clonify_db.count
         logger.info('')
 
         logger.info('------------------')
