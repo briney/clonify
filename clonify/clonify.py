@@ -667,7 +667,7 @@ def run_clonify(seq_file, lineage_dir, args):
         seqs = pickle.load(f)
     seq_ids = [s['seq_id'] for s in seqs]
     if len(seq_ids) == 1:
-        return [], []
+        return []
     json_file = pretty_json(seqs, as_file=True, temp_dir=args.temp)
     cluster_file = json_file + '_cluster'
     # need to name for the clonify C++ program, and should put it
