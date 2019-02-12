@@ -22,6 +22,8 @@
 #
 
 
+import random
+import string
 from uuid import uuid4
 
 
@@ -37,6 +39,14 @@ class Lineages():
         self.cluster_ids = []
         self.lineage_dict = {}
         self._process_cluster_file(cluster_file)
+
+    
+    def __len__(self):
+        return len(self.lineages)
+
+    def __iter__(self):
+        for lineage in self.lineages:
+            yield lineage
 
     
     @property
@@ -64,11 +74,26 @@ class Lineage():
     '''
     Representation of a single lineage, as assigned by Clonify.
     '''
-    def __init__(self, seq_id):
-        self.seq_ids = [seq_id, ]
-        self.id = uuid4()
+    def __init__(self, seq_id=None, lineage_file=None):
+        self._id = None
+        if seq_id is not None:
+            self.seq_ids = [seq_id, ]
+        elif lineage_file is not None:
+            self.seq_ids = _parse_lineage_file(lineage_file)
+        else:
+            self.seq_ids = []
+    
+
+    def __len__(self):
+        return len(self.seq_ids)
 
     
+    @property
+    def id(self):
+        if self._id is None:
+            self._id = self.make_id()
+        return self._id
+
     @property
     def size(self):
         return len(self.seq_ids)
@@ -81,9 +106,22 @@ class Lineage():
     def write(self, direc):
         filename = os.path.join(direc, self.id)
         if os.path.isfile(filename):
-            self.id = uuid4()
+            self._id = self.make_id()
             filename = os.path.join(direc, self.id)
         with open(filename, 'w') as f:
             f.write('\n'.join(self.seq_ids))
         return filename
+
+
+    def make_id(self):
+        self._id = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+
+
+    def _parse_lineage_file(self, lineage_file):
+        seq_ids = []
+        with open(lineage_file, 'r') as f:
+            for line in f:
+                if line.strip():
+                    seq_ids.append(line.strip())
+        return seq_ids
 

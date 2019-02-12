@@ -139,7 +139,7 @@ def parse_args():
 
 class Args(object):
     """docstring for Args"""
-    def __init__(self, json=json, db=None, collection=None,
+    def __init__(self, json=None, sequences=None, db=None, collection=None,
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, log=None, non_redundant=False, clustering_threshold=0.65,
@@ -148,6 +148,7 @@ class Args(object):
         super(Args, self).__init__()
         
         self.json = json
+        self.sequences = sequences
         self.db = db
         self.collection = collection
         self.selection_prefix = selection_prefix
@@ -172,12 +173,15 @@ class Args(object):
 
 
 def validate_args(args):
-    if all([args.json is None, args.db is None]):
+    if all([args.json is None, args.sequences is None, args.db is None]):
+        print('\n\n')
         print('ERROR: at least one of the following options is required:')
         print('--json, --db')
+        print('or a list of Sequence objects must be provided through the Clonify API.')
         sys.exit(1)
 
     if any([args.temp is None, args.logfile is None]):
+        print('\n\n')
         print('ERROR: the following options are required:')
         print('--temp, --log')
         sys.exit(1)
@@ -185,7 +189,6 @@ def validate_args(args):
     for d in [args.output, args.temp]:
         if d is not None:
             make_dir(d)
-
 
 
 
@@ -222,11 +225,39 @@ def get_sequences(group, args):
 
 
 
+
 ################################
 #
 #            JSON
 #
 ################################
+
+
+BASE_JSON = '''  {{
+    "v_gene": {{
+      "all": "{v_all}", 
+      "gene": "{v_gene}", 
+      "full": "{v_full}", 
+      "fam": "{v_fam}"
+    }}, 
+    "seq_id": "{seq_id}", 
+    "j_gene": {{
+      "all": "{j_all}", 
+      "full": "{j_full}", 
+      "gene": "{j_gene}"
+    }}, 
+    "junc_aa": "{junc_aa}", 
+    "var_muts_nt": {{
+      "muts": [\n{mut_string}\n      ],
+      "num": {mut_num}
+    }}
+  }}'''
+
+
+BASE_MUT = '''        {{
+          "loc": "{loc}", 
+          "mut": "{mut}"
+        }}'''
 
 
 def get_file_groups(args):
@@ -303,32 +334,23 @@ def pretty_json(sequences, as_file=False, temp_dir=None, raw=False, id_field='se
     return json_string
 
 
-BASE_JSON = '''  {{
-    "v_gene": {{
-      "all": "{v_all}", 
-      "gene": "{v_gene}", 
-      "full": "{v_full}", 
-      "fam": "{v_fam}"
-    }}, 
-    "seq_id": "{seq_id}", 
-    "j_gene": {{
-      "all": "{j_all}", 
-      "full": "{j_full}", 
-      "gene": "{j_gene}"
-    }}, 
-    "junc_aa": "{junc_aa}", 
-    "var_muts_nt": {{
-      "muts": [\n{mut_string}\n      ],
-      "num": {mut_num}
-    }}
-  }}'''
+def update_json(lineage_files, group, args):
+    logger.info('')
+    logger.info('Updating JSON files with clonality info')
+    ldict = {}
+    sdict = {}
+    for lf in lineage_files:
+        l = lineage.Lineage(lineage_file=lf)
+        for seq_id in l.seq_ids:
+            ldict[seq_id] = l.id
+            sdict[seq_id] = l.size            
+    # update the JSON files
+    # TODO
 
 
-BASE_MUT = '''        {{
-          "loc": "{loc}", 
-          "mut": "{mut}"
-        }}'''
-
+    # for s in args.sequences:
+    #     seq_id = s['seq_id']
+    #     s['clonify'] = {'id': ldict[seq_id], 'size': sdict[seq_id]}
 
 
 
@@ -345,6 +367,14 @@ QUERY = {'prod': 'yes', 'chain': 'heavy'}
 PROJECTION = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
               'junc_nt': 1, 'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
 
+def get_mongo_database(args):
+    return mongodb.get_db(args.db, ip=args.ip, port=args.port,
+                          user=args.user, password=args.password)
+
+
+def close_mongo_database(db):
+    db.client.close()
+
 
 def get_collection_groups(args):
     if args.collection is not None:
@@ -358,7 +388,7 @@ def get_collection_groups(args):
             return [[c, ] for c in sorted(colls)]
         else:
             return [[args.collection, ], ]
-    db = mongodb.get_db(args.db, ip=args.ip, port=args.port, user=args.user, password=args.password)
+    db = get_mongo_database(args)
     all_collections = mongodb.get_collections(db)
     if args.selection_prefix:
         prefix_collections = [c for c in all_collections if c.startswith(args.selection_prefix)]
@@ -387,114 +417,69 @@ def get_collection_groups(args):
     return [[c, ] for c in sorted(all_collections)]
 
 
-def get_collections(args):
-    if args.collection:
-        if os.path.isfile(args.collection):
-            colls = []
-            with open(args.collection) as f:
-                for line in f:
-                    colls.append(line.strip())
-            return sorted(colls)
-        else:
-            return [args.collection, ]
-    collections = db.collection_names(include_system_collections=False)
-    if args.selection_prefix:
-        collections = [c for c in collections if c.startswith(args.selection_prefix)]
-    return sorted(collections)
-
-
-# def query(collection, args):
-#     c = db[collection]
-#     # vdj_query = 'vdj_nt' if args.non_redundant == 'nt' else 'vdj_aa'
-#     results = c.find({'chain': 'heavy', 'prod': 'yes', 'cdr3_len': {'$gte': 2}},
-#                      {'_id': 0, 'seq_id': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'junc_aa': 1,
-#                       'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1})
-#     return [r for r in results]
-
-
-def ensure_index(field, group):
+def ensure_index(db, field, group):
     logger.info('\nEnsuring indexes prior to updating:')
     for collection in group:
         logger.info("Indexing '{}' on {}...".format(field, collection))
-        coll = db[collection]
-        coll.ensure_index(field)
+        db[collection].ensure_index(field)
 
 
-def update_db(clusters, group):
-    print_update_info()
-    start = time.time()
-    sizes = []
-    # p = mp.Pool(processes=250)
-    # async_results = []
-    # for c in clusters:
-    #     sizes.append(c.size)
-    #     # async_results.append(p.apply_async(update, args=(c, group)))
-    #     update(c, group)
-    
-    progbar.progress_bar(0, len(clusters))
+def update_mongodb(lineage_files, group, args):
+    logger.info('')
+    logger.info('Updating the MongoDB database with clonality info')
+    db = get_mongo_database(args)
+    ensure_index(db, 'seq_id', group)
+    start = datetime.now()
+    progbar.progress_bar(0, len(lineage_files), start_time=start)
     update_threads = 250
-    for i in range(0, len(clusters), update_threads):
+    for i in range(0, len(lineage_files), update_threads):
         tlist = []
-        end = min([i + update_threads, len(clusters)])
-        for c in clusters[i:end]:
-            # if non_redundant:
-            #     seq_ids = expand_nr_seqs(c.seq_ids)
-            # else:
-            #     seq_ids = c.seq_ids
-            sizes.append(c.size)
-            t = Thread(target=update, args=(c, group))
+        end = min([i + update_threads, len(lineage_files)])
+        for lf in lineage_files[i:end]:
+            l = lineage.Lineage(lineage_file=lf)
+            sizes.append(l.size)
+            t = Thread(target=mongoupdate, args=(db, l, group))
             t.start()
             tlist.append(t)
         for t in tlist:
             t.join()
-        progbar.progress_bar(end, len(clusters))
-    print('')
+        progbar.progress_bar(end, len(lineage_files))
 
 
-    # monitor_update(async_results)
-    # p.close()
-    # p.join()
-    seq_count = sum(sizes)
-    run_time = time.time() - start
-    logger.info('Updating took {} seconds. ({} sequences per second)'.format(round(run_time, 2), round(seq_count / run_time, 1)))
-    return sizes
-
-
-def update(clust, group):
+def mongoupdate(db, lineage, group):
     for collection in group:
         c = db[collection]
-        update_result = c.update_many({'seq_id': {'$in': clust.seq_ids}},
-                                      {'$set': {'clonify': {'id': clust.name, 'size': clust.size}}})
-        # try:
-        #     debug = [collection]
-        #     debug.append('matching records: {}'.format(update_result.matched_count))
-        #     debug.append('modified records: {}'.format(update_result.modified_count))
-        #     debug.append('cluster size: {}'.format(clust.size))
-        #     debug.append('')
-        #     print('\n'.join(debug))
-        # except:
-        #     print(traceback.format_exc())
+        update_result = c.update_many({'seq_id': {'$in': lineage.seq_ids}},
+                                      {'$set': {'clonify': {'id': lineage.id, 'size': lineage.size}}})
 
 
-# def get_sequences(collection_group, args):
-#     seqs = []
-#     if args.non_redundant:
-#         from .utils import nr
-#         nr_db = nr.make_nr_seq_db(args)
-#         for collection in collection_group:
-#             print_collection_info(collection)
-#             coll_seqs = query(collection, args)
-#             nr_coll_seqs = nr.make_nr(coll_seqs, nr_db, args)
-#             seqs += nr_coll_seqs
-#             print_query_info(coll_seqs, nr=nr_coll_seqs)
-#     else:
-#         nr_db = None
-#         for collection in collection_group:
-#             print_collection_info(collection)
-#             coll_seqs = query(collection, args)
-#             seqs += coll_seqs
-#             print_query_info(coll_seqs)
-#     return seqs, nr_db
+
+
+
+################################
+#
+#          SEQUENCES
+#
+################################
+
+
+def update_sequences(lineage_files, args):
+    logger.info('')
+    logger.info('Updating sequences with clonality info')
+    ldict = {}
+    sdict = {}
+    for lf in lineage_files:
+        l = lineage.Lineage(lineage_file=lf)
+        for seq_id in l.seq_ids:
+            ldict[seq_id] = l.id
+            sdict[seq_id] = l.size            
+    # update the sequence objects
+    for s in args.sequences:
+        seq_id = s['seq_id']
+        s['clonify'] = {'id': ldict[seq_id], 'size': sdict[seq_id]}
+
+
+
 
 
 ################################
@@ -653,10 +638,11 @@ def clonify(seq_files, lineage_dir, args):
 def run_clonify_singlethreaded(seq_files, lineage_dir, args):
     start = datetime.now()
     sizes = []
+    fcount = len(seq_files)
     for i, seq_file in enumerate(seq_files):
-        progbar.progress_bar(i, len(seq_files), start_time=start)
+        progbar.progress_bar(i, fcount, start_time=start)
         sizes += run_clonify(seq_file, lineage_dir, args)
-    progbar.progress_bar(len(seq_files), len(seq_files), start_time=start,
+    progbar.progress_bar(fcount, fcount, start_time=start,
                          complete=True, completion_string='\n')
     return sizes
 
@@ -684,13 +670,11 @@ def run_clonify_via_celery(seq_files, lineage_dir, args):
     pass
 
 
-
-
 def run_clonify(seq_file, lineage_dir, args):
     '''
     Runs clonify on the sequences contained in a JSON file.
 
-    Returns a Clonifyb Lineages object.
+    Returns a Clonify Lineages object.
 
     The JSON file and intermediate cluster file will be deleted
     unless ``args.debug == True``.
@@ -718,6 +702,15 @@ def run_clonify(seq_file, lineage_dir, args):
         os.unlink(json_file)
         os.unlink(cluster_file)
     return lineage_files, sizes
+
+
+def update_clonify_info(lineage_files, group, args):
+    if args.db is not None:
+        update_mongodb(lineage_files, group, args)
+    elif args.json is not None:
+        update_json(lineage_files, group, args)
+    else:
+        update_sequences(lineage_files, args)
 
 
 
@@ -1074,9 +1067,10 @@ def print_output(args):
     logger.info('Writing clonality information to file ({}).'.format(args.output))
 
 
-def print_update_info():
-    logger.info('')
-    logger.info('Updating the MongoDB database with clonality info')
+# def print_update_info():
+#     logger.info('')
+#     logger.info('Updating the MongoDB database with clonality info')
+
 
 
 # def print_finished(clust_sizes):
@@ -1095,6 +1089,38 @@ def print_update_info():
 #     logger.info('The largest cluster contains {} sequences.'.format(max_clust_size))
 #     logger.info('%s sequences were assigned to clonal families (%0.2f%% of all sequences).' % (clustered_seqs, 100.0 * clustered_seqs / seq_count))
 #     logger.info('\n')
+
+
+def print_group_info(group, num, num_groups, args):
+    '''
+    Prints information about the currently in-process sequence/file/collection group.
+
+    Args:
+
+        grpup (list): list of sequences, JSON file paths, or MongoDB collectinos.
+
+        num (int): the number of the current group.
+
+        num_groups (int): total number of groups to be processed.
+
+    Returns:
+
+        None
+    '''
+    gtype = 'SEQUENCE'
+    if args.db is not None:
+        gtype = 'COLLECTION'
+    if args.json is not None:
+        gtype = 'JSON FILE'
+    gstring = '  {} GROUP #{}  '.format(gtype, num)
+    logger.info('=' * len(gstring))
+    logger.info(gstring)
+    logger.info('=' * len(gstring))
+    logger.info('')
+    logger.info('group {} of {}'.format())
+    logger.info('')
+    logger.info('\n'.join(group))
+    logger.info('')
 
 
 def print_clonify_results(seq_count, lineage_sizes):
@@ -1132,7 +1158,8 @@ def main(args):
 
     for i, group in enumerate(groups, 1):
 
-        print_group_info(group, i, num_groups)
+        if num_groups > 1:
+            print_group_info(group, i, num_groups, args)
 
         logger.info('----------------')
         logger.info('  INITIALIZING  ')
@@ -1164,7 +1191,7 @@ def main(args):
         logger.info('----------')
         logger.info('  UPDATE  ')
         logger.info('----------')
-        update_clonify_info(lineage_files)
+        update_clonify_info(lineage_files, group, args)
 
 
 
