@@ -585,6 +585,7 @@ def cluster_vj_groups(groups, clonify_db, args):
     print(groups)
 
 
+    start = datetime.now()
     for i, group in enumerate(groups):
         v, j = os.path.basename(group).split('_')
         progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
