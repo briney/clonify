@@ -724,7 +724,7 @@ using namespace std;
 #define NO_TIMING // remove ALL calls to timing functions
 
 //#define PROFILING // enable profiling
-#define SLOW_MODE // disable megaclustering (much slower but could be more accurate)
+//#define SLOW_MODE // disable megaclustering (much slower but could be more accurate)
 
 
 /*
