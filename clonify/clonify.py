@@ -1250,10 +1250,14 @@ def main(args):
         logger.info('  CLEANING UP  ')
         logger.info('---------------')
         if not args.debug:
-            logger.info('Removing VJ group files...')
-            shutil.rmtree(vj_group_dir)
-            logger.info('Removing VJ cluster files...')
-            shutil.rmtree(cluster_dir)
+            if args.preprocessing:
+                logger.info('Removing VJ group files...')
+                shutil.rmtree(vj_group_dir)
+                logger.info('Removing VJ cluster files...')
+                shutil.rmtree(cluster_dir)
+            else:
+                logger.info('Removing Clonify input data...')
+                shutil.rmtree(cluster_dir)
             logger.info('Removing lineage files...')
             shutil.rmtree(lineage_dir)
             logger.info('Removing ClonifyDB...')
