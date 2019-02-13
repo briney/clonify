@@ -112,6 +112,10 @@ def parse_args():
     #                     Options are 'nt' or 'aa', which collapse identical nucleotide or amino acid sequences, respectively. \
     #                     Best for collections that contain redundant sequences \
     #                     and are large enough to cause clonify segfaults.")
+    parser.add_argument('--no-preclustering', dest='preclustering', action='store_false', default=True,
+                        help="If set, will not perform pre-clustering by V/J genes and CDR3 homology. \
+                        For small datasets this may improve accuracy, but for large datasets this will result \
+                        in much longer runtimes (and possibly failure).")
     parser.add_argument('--clustering-threshold', default=0.65, type=float,
                         help="Threshold to be used when clustering VJ groups of sequences. \
                         Default is 1.0.")
@@ -146,7 +150,7 @@ class Args(object):
     def __init__(self, json=None, sequences=None, db=None, collection=None,
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
-        output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65,
+        output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
         clustering_memory_allocation=800, distance_cutoff=0.35, celery=False, update=True, debug=False):
         
         super(Args, self).__init__()
@@ -169,6 +173,7 @@ class Args(object):
         self.logfile = logfile
         # self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
+        self.preclustering = preclustering
         self.clustering_memory_allocation = int(clustering_memory_allocation)
         # self.distance_cutoff = float(distance_cutoff)
         self.celery = celery
@@ -668,7 +673,9 @@ def run_clonify(seq_file, lineage_dir, args):
     seq_ids = [s['seq_id'] for s in seqs]
     if len(seq_ids) == 1:
         return []
-    json_file = pretty_json(seqs, as_file=True, temp_dir=args.temp)
+    clonify_dir = os.path.join(args.temp, 'clonify')
+    make_dir(clonify_dir)
+    json_file = pretty_json(seqs, as_file=True, temp_dir=clonify_dir)
     cluster_file = json_file + '_cluster'
     # need to name for the clonify C++ program, and should put it
     # in a location on my $PATH so that I can call it directly.
@@ -688,6 +695,16 @@ def run_clonify(seq_file, lineage_dir, args):
         os.unlink(json_file)
         os.unlink(cluster_file)
     return sizes
+
+
+def write_clonify_input(sequences, args):
+    seq_dir = os.path.join(args.temp, 'sequences')
+    make_dir(seq_dir)
+    seq_file = os.path.join(seq_dir, 'sequences')
+    with open(seq_file, 'wb') as f:
+        pickle.dump(sequences, seq_file)
+    return seq_dir
+     
 
 
 def update_clonify_info(lineage_files, group, args):
@@ -1191,12 +1208,18 @@ def main(args):
         logger.info('------------------')
         logger.info('  PRE-CLUSTERING  ')
         logger.info('------------------')
-        logger.info('Grouping sequences by V/J gene...')
-        vj_group_dir = group_by_vj(clonify_db, args)
-        vj_group_files = list_files(vj_group_dir)
-        logger.info('Clustering sequences within each VJ group...')
-        cluster_dir = cluster_vj_groups(vj_group_files, clonify_db, args)
-        cluster_files = list_files(cluster_dir)
+        if args.preclustering:
+            logger.info('Grouping sequences by V/J gene...')
+            vj_group_dir = group_by_vj(clonify_db, args)
+            vj_group_files = list_files(vj_group_dir)
+            logger.info('Clustering sequences within each VJ group...')
+            cluster_dir = cluster_vj_groups(vj_group_files, clonify_db, args)
+            cluster_files = list_files(cluster_dir)
+        else:
+            logger.info('Clonify is being run without pre-clustering.')
+            logger.info('Writing Clonify input...')
+            cluster_dir = write_clonify_input(sequences, args)
+            cluster_files = list_files(cluster_dir)
         logger.info('')
 
         logger.info('-----------')
