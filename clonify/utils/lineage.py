@@ -92,7 +92,10 @@ class Lineage():
     @property
     def id(self):
         if self._id is None:
-            self._id = self.make_id()
+            if self.lineage_file is not None:
+                self._id = os.path.basename(self.lineage_file)
+            else:
+                self._id = self.make_id()
         return self._id
 
     @property

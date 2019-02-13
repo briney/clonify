@@ -707,7 +707,7 @@ def write_clonify_output(lineage_files, clonify_db, group_id, args):
             l = Lineage(lineage_file=lf)
             seqs = clonify_db.get_sequences_by_id(l.seq_ids)
             fstring = '\n'.join(['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in seqs])
-            f.write(fstring + '\n')
+            f.write('#{}\n'.format(l.id) + fstring + '\n\n')
 
 
 
@@ -1202,7 +1202,7 @@ def main(args):
         logger.info('-----------')
         logger.info('  CLONIFY  ')
         logger.info('-----------')
-        logger.info('Running Clonify...')
+        # logger.info('Running Clonify...')
         lineage_dir, lineage_sizes = clonify(cluster_files, lineage_dir, args)
         lineage_files = list_files(lineage_dir)
         print_clonify_results(seq_count, lineage_sizes)
