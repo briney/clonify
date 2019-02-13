@@ -77,6 +77,7 @@ class Lineage():
     '''
     def __init__(self, seq_id=None, lineage_file=None):
         self._id = None
+        self.lineage_file = lineage_file
         if seq_id is not None:
             self.seq_ids = [seq_id, ]
         elif lineage_file is not None:
