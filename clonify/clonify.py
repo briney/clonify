@@ -702,7 +702,7 @@ def write_clonify_input(sequences, args):
     make_dir(seq_dir)
     seq_file = os.path.join(seq_dir, 'sequences')
     with open(seq_file, 'wb') as f:
-        pickle.dump(sequences, seq_file)
+        pickle.dump(sequences, f)
     return seq_dir
      
 
