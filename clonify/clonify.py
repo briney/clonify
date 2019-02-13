@@ -697,10 +697,11 @@ def run_clonify(seq_file, lineage_dir, args):
     return sizes
 
 
-def write_clonify_input(sequences, args):
+def write_clonify_input(clonify_db, args):
     seq_dir = os.path.join(args.temp, 'sequences')
     make_dir(seq_dir)
     seq_file = os.path.join(seq_dir, 'sequences')
+    sequences = clonify_db.get_all_sequences()
     with open(seq_file, 'wb') as f:
         pickle.dump(list(sequences), f)
     return seq_dir
@@ -1218,7 +1219,7 @@ def main(args):
         else:
             logger.info('Clonify is being run without pre-clustering.')
             logger.info('Writing Clonify input...')
-            cluster_dir = write_clonify_input(sequences, args)
+            cluster_dir = write_clonify_input(clonify_db, args)
             cluster_files = list_files(cluster_dir)
         logger.info('')
 

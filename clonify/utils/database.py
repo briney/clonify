@@ -122,6 +122,16 @@ class ClonifyDB(SQLiteDatabase):
         results = self.cursor.execute(query_str, (v, j))
         return [(r[0], r[1]) for r in results]
 
+    
+    def get_all_sequences(self):
+        '''
+
+        '''
+        query = '''SELECT {0}.sequence
+                   FROM {0}'''.format(self.table_name)
+        results = self.cursor.execute(query)
+        return [pickle.loads(r[0]) for r in results]
+
 
     def get_sequences_by_id(self, ids):
         '''
