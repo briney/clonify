@@ -1250,7 +1250,7 @@ def main(args):
         logger.info('  CLEANING UP  ')
         logger.info('---------------')
         if not args.debug:
-            if args.preprocessing:
+            if args.preclustering:
                 logger.info('Removing VJ group files...')
                 shutil.rmtree(vj_group_dir)
                 logger.info('Removing VJ cluster files...')
