@@ -510,7 +510,7 @@ def update_sequences(lineage_files, args):
 def build_clonify_db(sequences, args):
     logger.info('')
     logger.info('Building a SQLite database of Sequence data...')
-    clonifydb = ClonifyDB('clonify', args.temp)
+    clonifydb = ClonifyDB('clonify_db', args.temp)
     clonifydb.insert(sequences)
     clonifydb.commit()
     logger.info('Indexing...')
