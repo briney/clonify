@@ -1227,13 +1227,14 @@ def main(args):
         print_clonify_results(seq_count, lineage_sizes)
         logger.info('')
 
-        logger.info('----------')
-        logger.info('  UPDATE  ')
-        logger.info('----------')
-        update_clonify_info(lineage_files, group, args)
-        logger.info('')
-        
         if args.update:
+            logger.info('----------')
+            logger.info('  UPDATE  ')
+            logger.info('----------')
+            update_clonify_info(lineage_files, group, args)
+            logger.info('')
+        
+        if args.output is not None:
             logger.info('----------')
             logger.info('  OUTPUT  ')
             logger.info('----------')
