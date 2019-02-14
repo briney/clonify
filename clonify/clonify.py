@@ -592,7 +592,7 @@ def compile_clonify_binary(args):
     old_lenpenalty = 'const int len_penalty = 2;'
     new_lenpenalty = 'const int len_penalty = {};'.format(args.length_penalty)
     cppdata.replace(old_lenpenalty, new_lenpenalty)
-    with open(bin_dir, 'cluster.cpp', 'w') as f:
+    with open(os.path.join(bin_dir, 'cluster.cpp'), 'w') as f:
         f.write(cppdata)
     make_cmd = 'cd {} && make'.format(bin_dir)
     p = sp.Popen(make_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
