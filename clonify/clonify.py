@@ -1357,12 +1357,12 @@ def run_standalone(args):
 
 def run(input=None, **kwargs):
     if input is not None:
-        # check for a JSON file/directory
-        if any([os.path.isfile(input), os.path.isdir(input)]):
-            kwargs['json'] = input
         # check for an iterable of Sequence objects
-        elif type(input) in [list, tuple] and type(input[0]) == Sequence:
+        if type(input) in [list, tuple] and type(input[0]) == Sequence:
             kwargs['sequences'] = input
+        # check for a JSON file/directory
+        elif any([os.path.isfile(input), os.path.isdir(input)]):
+            kwargs['json'] = input
         # only option left is a MongoDB directory
         else:
             kwargs['db'] = input
