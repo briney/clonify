@@ -118,7 +118,10 @@ def parse_args():
                         in much longer runtimes (and possibly failure).")
     parser.add_argument('--clustering-threshold', default=0.65, type=float,
                         help="Threshold to be used when clustering VJ groups of sequences. \
-                        Default is 1.0.")
+                        Default is 0.65.")
+    parser.add_argument('--clustering-field', default='vdj_nt', choices=['vdj_nt', 'cdr3_nt'],
+                        help="Field used for clustering sequences in each VJ group. Choices are: \
+                        'vdj_nt' and 'cdr3_nt'. Default is 'vdj_nt'.")
     parser.add_argument('--clustering-memory-allocation', default=800, type=int,
                         help='Amount of memory allocated to CD-HIT for clustering of VJ groups, in MB. Default is 800')
     # The following option ('-x') doesn't do anything at the moment.
@@ -374,7 +377,7 @@ def update_json(lineage_files, group, args):
 
 QUERY = {'prod': 'yes', 'chain': 'heavy'}
 PROJECTION = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
-              'junc_nt': 1, 'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
+              'cdr3_nt': 1, 'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
 
 def get_mongo_database(args):
     return mongodb.get_db(args.db, ip=args.ip, port=args.port,
@@ -534,7 +537,7 @@ def group_by_vj(clonify_db, args):
     count = 0
     for v, j in itertools.product(vs, js):
         progbar.progress_bar(count, total, start_time=start, extra_info='{}, {}    '.format(v, j))
-        seqs = clonify_db.get_cdr3s_for_vj_group(v, j)
+        seqs = clonify_db.get_seqs_for_vj_group(v, j, args.clustering_field)
         if not seqs:
             count += 1
             continue
@@ -1148,16 +1151,6 @@ def print_group_info(group, num, num_groups, args):
 
 
 def print_clonify_results(seq_count, lineage_sizes):
-
-
-
-
-    print(lineage_sizes)
-    
-    
-    
-    
-    
     gt1_sizes = [l for l in lineage_sizes if l > 1] 
     lineage_count = len(gt1_sizes)
     mean = np.mean(gt1_sizes)

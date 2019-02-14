@@ -52,12 +52,12 @@ class ClonifyDB(SQLiteDatabase):
     @property
     def structure(self):
         return [('id', 'text'), ('vgene', 'text'), ('jgene', 'text'),
-                ('cdr3_nt', 'text'), ('sequence', 'text')]
+                ('cdr3_nt', 'text'), ('vdj_nt', 'text'), ('sequence', 'text')]
 
     
     @property
     def fields(self):
-        return [['seq_id'], ['v_gene', 'gene'], ['j_gene', 'gene'], ['cdr3_nt']]
+        return [['seq_id'], ['v_gene', 'gene'], ['j_gene', 'gene'], ['cdr3_nt'], ['vdj_nt']]
 
     
     @property
@@ -119,6 +119,18 @@ class ClonifyDB(SQLiteDatabase):
         query_str = '''SELECT {0}.id, {0}.cdr3_nt, {0}.vgene, {0}.jgene
                        FROM {0}
                        WHERE {0}.vgene LIKE ? and {0}.jgene LIKE ?'''.format(self.table_name)
+        results = self.cursor.execute(query_str, (v, j))
+        return [(r[0], r[1]) for r in results]
+
+
+    def get_seqs_for_vj_group(self, v, j, clustering_field):
+        '''
+
+        '''
+        query_str = '''SELECT {0}.id, {0}.{1}, {0}.vgene, {0}.jgene
+                       FROM {0}
+                       WHERE {0}.vgene LIKE ? and {0}.jgene LIKE ?'''.format(self.table_name,
+                                                                             clustering_field)
         results = self.cursor.execute(query_str, (v, j))
         return [(r[0], r[1]) for r in results]
 
