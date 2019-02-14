@@ -154,7 +154,8 @@ class Args(object):
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
-        clustering_memory_allocation=800, distance_cutoff=0.35, celery=False, update=True, debug=False):
+        clustering_memory_allocation=800, clustering_field='vdj_nt', distance_cutoff=0.35,
+        celery=False, update=True, debug=False):
         
         super(Args, self).__init__()
         
@@ -176,6 +177,7 @@ class Args(object):
         self.logfile = logfile
         # self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
+        self.clustering_field = clustering_field
         self.preclustering = preclustering
         self.clustering_memory_allocation = int(clustering_memory_allocation)
         # self.distance_cutoff = float(distance_cutoff)
