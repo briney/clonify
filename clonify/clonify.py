@@ -125,9 +125,13 @@ def parse_args():
     parser.add_argument('--clustering-memory-allocation', default=800, type=int,
                         help='Amount of memory allocated to CD-HIT for clustering of VJ groups, in MB. Default is 800')
     # The following option ('-x') doesn't do anything at the moment.
-    # parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
-    #                     help="NOT YET IMPLEMENTED. The cutoff adjusted edit distance (aED) for segregating \
-    #                     sequences into clonal families. Defaults to 0.35.")
+    parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
+                        help="The cutoff normalized Levenshtein distance (nLD) for segregating \
+                        sequences into clonal families. Default is 0.35.")
+    parser.add_argument('--shared-mutation-bonus', dest='shared_mutation_bonus', default=0.35, type=float,
+                        help="Bonus applied for shared mutations. Default is 0.35.")
+    parser.add_argument('--length-penalty', dest='length_penalty', default=2, type=int,
+                        help="Penalty for differences in CDR3 length (per AA). Default is 2.")
     parser.add_argument('-C', '--celery', dest="celery", default=False, action='store_true',
                         help="NOT YET IMPLEMENTED. Use if performing computation on a Celery cluster. \
                         If set, input files will be split into many subfiles and passed \
@@ -154,8 +158,8 @@ class Args(object):
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
-        clustering_memory_allocation=800, clustering_field='vdj_nt', distance_cutoff=0.35,
-        celery=False, update=True, debug=False):
+        clustering_memory_allocation=800, clustering_field='vdj_nt', distance_cutoff=0.35, shared_mutation_bonus=0.35,
+        length_penalty=2, celery=False, update=True, debug=False):
         
         super(Args, self).__init__()
         
@@ -180,7 +184,9 @@ class Args(object):
         self.clustering_field = clustering_field
         self.preclustering = preclustering
         self.clustering_memory_allocation = int(clustering_memory_allocation)
-        # self.distance_cutoff = float(distance_cutoff)
+        self.distance_cutoff = float(distance_cutoff)
+        self.shared_mutation_bonus = float(shared_mutation_bonus)
+        self.length_penalty = int(length_penalty)
         self.celery = celery
         self.update = update
         self.debug = debug
@@ -562,6 +568,50 @@ def group_by_vj(clonify_db, args):
 ################################
 
 
+def compile_clonify_binary(args):
+    # get source directories and files
+    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src_dir = os.path.join(pkg_dir, 'cluster')
+    makefile = os.path.join(src_dir, 'Makefile')
+    cppfile = os.path.join(src_dir, 'cluster.cpp')
+    bin_dir = os.path.join(args.temp, 'bin')
+    make_dir(bin_dir)
+    # copy makefile, edit cpp file to include proper clustering parameters
+    shutil.copy(makefile, bin_dir)
+    with open(cppfile) as f:
+        cppdata = f.read()
+    old_cutoff = 'const double cutoff = 0.35;'
+    new_cutoff = 'const double cutoff = {};'.format(args.distance_cutoff)
+    cppdata.replace(old_cutoff, new_cutoff)
+    old_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = 0.40;'
+    new_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = {};'.format(args.distance_cutoff + 0.1)
+    cppdata.replace(old_minmega, new_minmega)
+    old_bonus = 'const double mut_value = 0.35;'
+    new_bonus = 'const double mut_value = {};'.format(args.shared_mutation_bonus)
+    cppdata.replace(old_bonus, new_bonus)
+    old_lenpenalty = 'const int len_penalty = 2;'
+    new_lenpenalty = 'const int len_penalty = {};'.format(args.length_penalty)
+    cppdata.replace(old_lenpenalty, new_lenpenalty)
+    with open(bin_dir, 'cluster.cpp', 'w') as f:
+        f.write(cppdata)
+    make_cmd = 'cd {} && make'.format(bin_dir)
+    p = sp.Popen(make_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+    stdout, stderr = p.communicate()
+    if args.debug:
+        logger.debug('COMPILATION OUTPUT')
+        logger.debug('STDOUT:', stdout)
+        logger.debug('STDERR:', stderr)
+    clonify_bin = os.path.join(bin_dir, 'cluster')
+    if not os.path.isfile(clonify_bin):
+        err = 'ERROR: It appears that compiling the Clonify cluster binary has failed, '
+        err += 'as the compiled binary does not exist following execution of the make command. '
+        err += 'stderr from the make command:\n'
+        err += stderr
+        print(error)
+        sys.exit(1)
+    return os.path.abspath(clonify_bin)
+
+
 def cluster_vj_groups(groups, clonify_db, args):
     '''
     Clusters groups of sequences using a CDR3 similarity threshold. 
@@ -608,7 +658,7 @@ def cluster_vj_groups(groups, clonify_db, args):
     return cluster_dir
 
 
-def clonify(seq_files, lineage_dir, args):
+def clonify(clonify_bin, seq_files, lineage_dir, args):
     '''
     runs clonify on a set of sequence files (each separately, as they represent clustered VJ groups).
 
@@ -617,36 +667,39 @@ def clonify(seq_files, lineage_dir, args):
     if args.celery:
         logger.info('')
         logger.info('Running Clonify jobs via Celery...')
-        sizes = run_clonify_via_celery(seq_files, lineage_dir, args)
+        sizes = run_clonify_via_celery(clonify_bin, seq_files, lineage_dir, args)
     elif any([args.debug, ]):
         logger.info('')
         logger.info('Running Clonify...')
-        sizes = run_clonify_singlethreaded(seq_files, lineage_dir, args)
+        sizes = run_clonify_singlethreaded(clonify_bin, seq_files, lineage_dir, args)
     else:
         logger.info('')
         logger.info('Running Clonify jobs via multiprocessing...')
-        sizes = run_clonify_via_multiprocessing(seq_files, lineage_dir, args)
+        sizes = run_clonify_via_multiprocessing(clonify_bin, seq_files, lineage_dir, args)
     return lineage_dir, sizes
 
 
-def run_clonify_singlethreaded(seq_files, lineage_dir, args):
+def run_clonify_singlethreaded(clonify_bin, seq_files, lineage_dir, args):
     start = datetime.now()
     sizes = []
     fcount = len(seq_files)
     for i, seq_file in enumerate(seq_files):
         progbar.progress_bar(i, fcount, start_time=start)
-        sizes += run_clonify(seq_file, lineage_dir, args)
+        sizes += run_clonify(clonify_bin, seq_file, lineage_dir, args)
     progbar.progress_bar(fcount, fcount, start_time=start,
                          complete=True, completion_string='\n')
     return sizes
 
 
-def run_clonify_via_multiprocessing(seq_files, lineage_dir, args):
+def run_clonify_via_multiprocessing(clonify_bin, seq_files, lineage_dir, args):
     start = datetime.now()
     p = mp.Pool(maxtasksperchild=50)
     async_results = []
     for f in seq_files:
-        async_results.append([f, p.apply_async(run_clonify, (f, lineage_dir, args))])
+        async_results.append([f, p.apply_async(run_clonify, (clonify_bin,
+                                                             f,
+                                                             lineage_dir,
+                                                             args))])
     monitor_mp_jobs([a[1] for a in async_results])
     sizes = []
     for a in async_results:
@@ -660,11 +713,11 @@ def run_clonify_via_multiprocessing(seq_files, lineage_dir, args):
     return sizes
 
 
-def run_clonify_via_celery(seq_files, lineage_dir, args):
+def run_clonify_via_celery(clonify_bin, seq_files, lineage_dir, args):
     pass
 
 
-def run_clonify(seq_file, lineage_dir, args):
+def run_clonify(clonify_bin, seq_file, lineage_dir, args):
     '''
     Runs clonify on the sequences contained in a JSON file.
 
@@ -684,7 +737,7 @@ def run_clonify(seq_file, lineage_dir, args):
     cluster_file = json_file + '_cluster'
     # need to name for the clonify C++ program, and should put it
     # in a location on my $PATH so that I can call it directly.
-    clonify_cmd = 'cluster {} {}'.format(json_file, cluster_file)
+    clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
     p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
     stdout, stderr = p.communicate()
     logger.debug(stdout.strip())
@@ -1193,6 +1246,8 @@ def main(args):
         logger.info('----------------')
         logger.info('  INITIALIZING  ')
         logger.info('----------------')
+        logger.info('Configuring Clonify...')
+        clonify_bin = compile_clonify_binary(args)
         logger.info('Getting sequences...')
         sequences = get_sequences(group, args)
         logger.info('Building a SQLite sequence database...')
@@ -1222,7 +1277,7 @@ def main(args):
         logger.info('  CLONIFY  ')
         logger.info('-----------')
         # logger.info('Running Clonify...')
-        lineage_dir, lineage_sizes = clonify(cluster_files, lineage_dir, args)
+        lineage_dir, lineage_sizes = clonify(clonify_bin, cluster_files, lineage_dir, args)
         lineage_files = list_files(lineage_dir)
         print_clonify_results(seq_count, lineage_sizes)
         logger.info('')
