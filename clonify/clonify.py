@@ -603,7 +603,7 @@ def compile_clonify_binary(args):
 
     print('\n\n\n\n\n')
     print('NEW')
-    pritn(cppdata)
+    print(cppdata)
 
 
 
