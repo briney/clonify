@@ -580,34 +580,18 @@ def compile_clonify_binary(args):
     shutil.copy(makefile, bin_dir)
     with open(cppfile) as f:
         cppdata = f.read()
-
-
-    print('OLD')
-    print(cppdata)
-
-    
     old_cutoff = 'const double cutoff = 0.35;'
     new_cutoff = 'const double cutoff = {};'.format(args.distance_cutoff)
-    cppdata.replace(old_cutoff, new_cutoff)
+    cppdata = cppdata.replace(old_cutoff, new_cutoff)
     old_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = 0.40;'
     new_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = {};'.format(args.distance_cutoff + 0.1)
-    cppdata.replace(old_minmega, new_minmega)
+    cpp_data = cppdata.replace(old_minmega, new_minmega)
     old_bonus = 'const double mut_value = 0.35;'
     new_bonus = 'const double mut_value = {};'.format(args.shared_mutation_bonus)
-    cppdata.replace(old_bonus, new_bonus)
+    cppdata = cppdata.replace(old_bonus, new_bonus)
     old_lenpenalty = 'const int len_penalty = 2;'
     new_lenpenalty = 'const int len_penalty = {};'.format(args.length_penalty)
-    cppdata.replace(old_lenpenalty, new_lenpenalty)
-
-
-
-    print('\n\n\n\n\n')
-    print('NEW')
-    print(cppdata)
-
-
-
-
+    cppdata = cppdata.replace(old_lenpenalty, new_lenpenalty)
     with open(os.path.join(bin_dir, 'cluster.cpp'), 'w') as f:
         f.write(cppdata)
     make_cmd = 'cd {} && make'.format(bin_dir)
