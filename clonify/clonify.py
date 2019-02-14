@@ -580,6 +580,12 @@ def compile_clonify_binary(args):
     shutil.copy(makefile, bin_dir)
     with open(cppfile) as f:
         cppdata = f.read()
+
+
+    print('OLD')
+    print(cppdata)
+
+    
     old_cutoff = 'const double cutoff = 0.35;'
     new_cutoff = 'const double cutoff = {};'.format(args.distance_cutoff)
     cppdata.replace(old_cutoff, new_cutoff)
@@ -592,6 +598,16 @@ def compile_clonify_binary(args):
     old_lenpenalty = 'const int len_penalty = 2;'
     new_lenpenalty = 'const int len_penalty = {};'.format(args.length_penalty)
     cppdata.replace(old_lenpenalty, new_lenpenalty)
+
+
+
+    print('\n\n\n\n\n')
+    print('NEW')
+    pritn(cppdata)
+
+
+
+
     with open(os.path.join(bin_dir, 'cluster.cpp'), 'w') as f:
         f.write(cppdata)
     make_cmd = 'cd {} && make'.format(bin_dir)
