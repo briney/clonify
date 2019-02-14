@@ -173,7 +173,7 @@ class Args(object):
         self.user = user
         self.password = password
         self.output = output
-        self.temp = temp
+        self.temp = os.path.abspath(temp) if temp is not None else '/tmp'
         self.logfile = logfile
         # self.non_redundant = non_redundant
         self.clustering_threshold = clustering_threshold
