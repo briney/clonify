@@ -570,7 +570,7 @@ def group_by_vj(clonify_db, args):
 
 def compile_clonify_binary(args):
     # get source directories and files
-    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
     src_dir = os.path.join(pkg_dir, 'cluster')
     makefile = os.path.join(src_dir, 'Makefile')
     cppfile = os.path.join(src_dir, 'cluster.cpp')
