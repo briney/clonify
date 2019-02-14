@@ -1368,7 +1368,7 @@ def run(input=None, **kwargs):
             kwargs['db'] = input
     args = Args(**kwargs)
     global logger
-    log.get_logger('clonify')
+    logger = log.get_logger('clonify')
     main(args)
 
 
