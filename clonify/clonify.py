@@ -385,7 +385,7 @@ def update_json(lineage_files, group, args):
 
 QUERY = {'prod': 'yes', 'chain': 'heavy'}
 PROJECTION = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
-              'cdr3_nt': 1, 'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
+              'v_gene.full': 1, 'j_gene.full': 1,'cdr3_nt': 1, 'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
 
 def get_mongo_database(args):
     return mongodb.get_db(args.db, ip=args.ip, port=args.port,
