@@ -128,8 +128,8 @@ def parse_args():
     # The following option ('-x') doesn't do anything at the moment.
     parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
                         help="The cutoff normalized Levenshtein distance (nLD) for segregating \
-                        sequences into clonal families. Default is 0.35.")
-    parser.add_argument('--shared-mutation-bonus', dest='shared_mutation_bonus', default=0.35, type=float,
+                        sequences into clonal families. Default is 0.32.")
+    parser.add_argument('--shared-mutation-bonus', dest='shared_mutation_bonus', default=0.32, type=float,
                         help="Bonus applied for shared mutations. Default is 0.35.")
     parser.add_argument('--length-penalty', dest='length_penalty', default=2, type=int,
                         help="Penalty for differences in CDR3 length (per AA). Default is 2.")
@@ -599,29 +599,26 @@ def group_by_vj(clonify_db, args):
 def compile_clonify_binary(args):
     # get source directories and files
     pkg_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.join(pkg_dir, 'cluster')
+    src_dir = os.path.join(pkg_dir, 'src/clonify')
     makefile = os.path.join(src_dir, 'Makefile')
-    cppfile = os.path.join(src_dir, 'cluster.cpp')
+    ccfile = os.path.join(src_dir, 'clonify.cc')
     bin_dir = os.path.join(args.temp, 'bin')
     make_dir(bin_dir)
     # copy makefile, edit cpp file to include proper clustering parameters
     shutil.copy(makefile, bin_dir)
-    with open(cppfile) as f:
-        cppdata = f.read()
-    old_cutoff = 'const double cutoff = 0.35;'
+    with open(ccfile) as f:
+        ccdata = f.read()
+    old_cutoff = 'const double cutoff = 0.32;'
     new_cutoff = 'const double cutoff = {};'.format(args.distance_cutoff)
-    cppdata = cppdata.replace(old_cutoff, new_cutoff)
-    old_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = 0.40;'
-    new_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = {};'.format(args.distance_cutoff + 0.1)
-    cpp_data = cppdata.replace(old_minmega, new_minmega)
-    old_bonus = 'const double mut_value = 0.35;'
-    new_bonus = 'const double mut_value = {};'.format(args.shared_mutation_bonus)
-    cppdata = cppdata.replace(old_bonus, new_bonus)
-    old_lenpenalty = 'const int len_penalty = 2;'
-    new_lenpenalty = 'const int len_penalty = {};'.format(args.length_penalty)
-    cppdata = cppdata.replace(old_lenpenalty, new_lenpenalty)
-    with open(os.path.join(bin_dir, 'cluster.cpp'), 'w') as f:
-        f.write(cppdata)
+    ccdata = ccdata.replace(old_cutoff, new_cutoff)
+    old_bonus = '      bonus += 0.35;'
+    new_bonus = '      bonus += {};'.format(args.shared_mutation_bonus)
+    ccdata = ccdata.replace(old_bonus, new_bonus)
+    old_lenpenalty = '  double lenPenalty = fabs(0. + s1.junc.length() - s2.junc.length()) * 2;'
+    new_lenpenalty = '  double lenPenalty = fabs(0. + s1.junc.length() - s2.junc.length()) * {};'.format(args.length_penalty)
+    ccdata = ccdata.replace(old_lenpenalty, new_lenpenalty)
+    with open(os.path.join(bin_dir, 'clonify.cc'), 'w') as f:
+        f.write(ccdata)
     make_cmd = 'cd {} && make'.format(bin_dir)
     p = sp.Popen(make_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
     stdout, stderr = p.communicate()
@@ -638,6 +635,52 @@ def compile_clonify_binary(args):
         print(error)
         sys.exit(1)
     return os.path.abspath(clonify_bin)
+
+
+## THIS iS FOR THE "OLD" CLONIFY BIN, FROM TOPCODER
+## IT REGULARLY FAILS WITH A SEGFAULT, WHICH MAKES IT DIFFICULT TO USE/DEBUG
+# def compile_clonify_binary(args):
+#     # get source directories and files
+#     pkg_dir = os.path.dirname(os.path.abspath(__file__))
+#     src_dir = os.path.join(pkg_dir, 'src/cluster')
+#     makefile = os.path.join(src_dir, 'Makefile')
+#     cppfile = os.path.join(src_dir, 'cluster.cpp')
+#     bin_dir = os.path.join(args.temp, 'bin')
+#     make_dir(bin_dir)
+#     # copy makefile, edit cpp file to include proper clustering parameters
+#     shutil.copy(makefile, bin_dir)
+#     with open(cppfile) as f:
+#         cppdata = f.read()
+#     old_cutoff = 'const double cutoff = 0.35;'
+#     new_cutoff = 'const double cutoff = {};'.format(args.distance_cutoff)
+#     cppdata = cppdata.replace(old_cutoff, new_cutoff)
+#     old_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = 0.40;'
+#     new_minmega = 'const double MIN_MEGACLUSTER_DISSIMILARITY = {};'.format(args.distance_cutoff + 0.1)
+#     cpp_data = cppdata.replace(old_minmega, new_minmega)
+#     old_bonus = 'const double mut_value = 0.35;'
+#     new_bonus = 'const double mut_value = {};'.format(args.shared_mutation_bonus)
+#     cppdata = cppdata.replace(old_bonus, new_bonus)
+#     old_lenpenalty = 'const int len_penalty = 2;'
+#     new_lenpenalty = 'const int len_penalty = {};'.format(args.length_penalty)
+#     cppdata = cppdata.replace(old_lenpenalty, new_lenpenalty)
+#     with open(os.path.join(bin_dir, 'cluster.cpp'), 'w') as f:
+#         f.write(cppdata)
+#     make_cmd = 'cd {} && make'.format(bin_dir)
+#     p = sp.Popen(make_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+#     stdout, stderr = p.communicate()
+#     if args.debug:
+#         logger.debug('COMPILATION OUTPUT')
+#         logger.debug('STDOUT:', stdout)
+#         logger.debug('STDERR:', stderr)
+#     clonify_bin = os.path.join(bin_dir, 'cluster')
+#     if not os.path.isfile(clonify_bin):
+#         err = 'ERROR: It appears that compiling the Clonify cluster binary has failed, '
+#         err += 'as the compiled binary does not exist following execution of the make command. '
+#         err += 'stderr from the make command:\n'
+#         err += stderr
+#         print(error)
+#         sys.exit(1)
+#     return os.path.abspath(clonify_bin)
 
 
 def cluster_vj_groups(groups, clonify_db, args):
