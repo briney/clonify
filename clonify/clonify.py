@@ -324,13 +324,13 @@ def pretty_json(sequences, as_file=False, temp_dir=None, raw=False, id_field='se
         if len(s['var_muts_nt']['muts']) == 0:
             bases = ['A', 'C', 'G', 'T']
             s['var_muts_nt']['num'] = 1
-            s['var_muts_nt']['muts'] = [{'loc': '{}.0'.format(random.randint(1, 300)),
+            s['var_muts_nt']['muts'] = [{'loc': '{}'.format(random.randint(1, 300)),
                                         'mut': '{}>{}'.format(random.choice(bases), random.choice(bases))}]
         # this is to account for old/new versions of AbStar
         if 'loc' in s['var_muts_nt']['muts'][0]:
-            mut_list = [BASE_MUT.format(loc=m['loc'], mut=m['mut']) for m in s['var_muts_nt']['muts']]
+            mut_list = [BASE_MUT.format(loc=int(m['loc']), mut=m['mut']) for m in s['var_muts_nt']['muts']]
         else:
-            mut_list = [BASE_MUT.format(loc=m['position'], mut='{}>{}'.format(m['was'], m['is'])) for m in s['var_muts_nt']['muts']]
+            mut_list = [BASE_MUT.format(loc=int(m['position']), mut='{}>{}'.format(m['was'], m['is'])) for m in s['var_muts_nt']['muts']]
         mut_string = ', \n'.join(mut_list)
         jsons.append(BASE_JSON.format(v_all=s['v_gene']['full'].split('*')[-1],
                                         v_gene='-'.join(s['v_gene']['full'].split('*')[0].split('-')[1:]),
