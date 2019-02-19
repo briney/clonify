@@ -2,4 +2,6 @@ include README.md
 include docs/*.txt
 include clonify/bin/*
 include clonify/utils/*
-include clonify/cluster/*
+include clonify/src/*
+include clonify/src/cluster/*
+include clonify/src/clonify/*
