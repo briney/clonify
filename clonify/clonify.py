@@ -275,6 +275,27 @@ BASE_JSON = '''  {{
   }}'''
 
 
+BASE_JSON_NOMUTS = '''  {{
+    "v_gene": {{
+      "all": "{v_all}", 
+      "gene": "{v_gene}", 
+      "full": "{v_full}", 
+      "fam": "{v_fam}"
+    }}, 
+    "seq_id": "{seq_id}", 
+    "j_gene": {{
+      "all": "{j_all}", 
+      "full": "{j_full}", 
+      "gene": "{j_gene}"
+    }}, 
+    "junc_aa": "{junc_aa}", 
+    "var_muts_nt": {{
+      "muts": [],
+      "num": 0
+    }}
+  }}'''
+
+
 BASE_MUT = '''        {{
           "loc": "{loc}", 
           "mut": "{mut}"
@@ -322,27 +343,33 @@ def pretty_json(sequences, as_file=False, temp_dir=None, raw=False, id_field='se
     jsons = []
     for s in sequences:
         if len(s['var_muts_nt']['muts']) == 0:
-            bases = ['A', 'C', 'G', 'T']
-            s['var_muts_nt']['num'] = 1
-            s['var_muts_nt']['muts'] = [{'loc': '{}'.format(random.randint(1, 300)),
-                                        'mut': '{}>{}'.format(random.choice(bases), random.choice(bases))}]
-        # this is to account for old/new versions of AbStar
-        if 'loc' in s['var_muts_nt']['muts'][0]:
-            mut_list = [BASE_MUT.format(loc=int(m['loc']), mut=m['mut']) for m in s['var_muts_nt']['muts']]
+            jsons.append(BASE_JSON_NOMUTS.format(v_all=s['v_gene']['full'].split('*')[-1],
+                                                 v_gene='-'.join(s['v_gene']['full'].split('*')[0].split('-')[1:]),
+                                                 v_full=s['v_gene']['full'],
+                                                 v_fam=s['v_gene']['full'].split('-')[0].replace('IGHV', ''),
+                                                 seq_id=s[id_field],
+                                                 j_all=s['j_gene']['full'].split('*')[-1],
+                                                 j_full=s['j_gene']['full'],
+                                                 j_gene=s['j_gene']['full'].split('*')[0].replace('IGHJ', ''),
+                                                 junc_aa=s['junc_aa']))
         else:
-            mut_list = [BASE_MUT.format(loc=int(m['position']), mut='{}>{}'.format(m['was'], m['is'])) for m in s['var_muts_nt']['muts']]
-        mut_string = ', \n'.join(mut_list)
-        jsons.append(BASE_JSON.format(v_all=s['v_gene']['full'].split('*')[-1],
-                                        v_gene='-'.join(s['v_gene']['full'].split('*')[0].split('-')[1:]),
-                                        v_full=s['v_gene']['full'],
-                                        v_fam=s['v_gene']['full'].split('-')[0].replace('IGHV', ''),
-                                        seq_id=s[id_field],
-                                        j_all=s['j_gene']['full'].split('*')[-1],
-                                        j_full=s['j_gene']['full'],
-                                        j_gene=s['j_gene']['full'].split('*')[0].replace('IGHJ', ''),
-                                        junc_aa=s['junc_aa'],
-                                        mut_string=mut_string,
-                                        mut_num=s['var_muts_nt']['num']))
+            # this is to account for old/new versions of AbStar
+            if 'loc' in s['var_muts_nt']['muts'][0]:
+                mut_list = [BASE_MUT.format(loc=int(m['loc']), mut=m['mut']) for m in s['var_muts_nt']['muts']]
+            else:
+                mut_list = [BASE_MUT.format(loc=int(m['position']), mut='{}>{}'.format(m['was'], m['is'])) for m in s['var_muts_nt']['muts']]
+            mut_string = ', \n'.join(mut_list)
+            jsons.append(BASE_JSON.format(v_all=s['v_gene']['full'].split('*')[-1],
+                                            v_gene='-'.join(s['v_gene']['full'].split('*')[0].split('-')[1:]),
+                                            v_full=s['v_gene']['full'],
+                                            v_fam=s['v_gene']['full'].split('-')[0].replace('IGHV', ''),
+                                            seq_id=s[id_field],
+                                            j_all=s['j_gene']['full'].split('*')[-1],
+                                            j_full=s['j_gene']['full'],
+                                            j_gene=s['j_gene']['full'].split('*')[0].replace('IGHJ', ''),
+                                            junc_aa=s['junc_aa'],
+                                            mut_string=mut_string,
+                                            mut_num=s['var_muts_nt']['num']))
     if raw:
         return ', \n  '.join(jsons)
     json_string = '[\n  ' + ', \n  '.join(jsons) + '\n] \n'
