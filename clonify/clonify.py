@@ -626,9 +626,9 @@ def compile_clonify_binary(args):
         logger.debug('COMPILATION OUTPUT')
         logger.debug('STDOUT:', stdout)
         logger.debug('STDERR:', stderr)
-    clonify_bin = os.path.join(bin_dir, 'cluster')
+    clonify_bin = os.path.join(bin_dir, 'clonify')
     if not os.path.isfile(clonify_bin):
-        err = 'ERROR: It appears that compiling the Clonify cluster binary has failed, '
+        err = 'ERROR: It appears that compiling the Clonify binary has failed, '
         err += 'as the compiled binary does not exist following execution of the make command. '
         err += 'stderr from the make command:\n'
         err += stderr
