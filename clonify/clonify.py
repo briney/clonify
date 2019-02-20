@@ -533,7 +533,14 @@ def update_sequences(lineage_files, args):
     # update the sequence objects
     for s in args.sequences:
         seq_id = s['seq_id']
-        s['clonify'] = {'id': ldict[seq_id], 'size': sdict[seq_id]}
+        # because we only assigned lineages on VJ-homology clusters with
+        # more than one sequence, some sequences may not be in any of
+        # the lineage files
+        if all([seq_id in ldict, seq_id in sdict]):
+            s['clonify'] = {'id': ldict[seq_id], 'size': sdict[seq_id]}
+        else:
+            l = Lineage(seq_id=seq_id)
+            s['clonify'] = {'id': l.id, 'size': 1}
 
 
 
