@@ -631,8 +631,8 @@ def compile_clonify_binary(args):
     stdout, stderr = p.communicate()
     if args.debug:
         logger.debug('COMPILATION OUTPUT')
-        logger.debug('STDOUT:', stdout.decode())
-        logger.debug('STDERR:', stderr.decode())
+        logger.debug('STDOUT:', stdout)
+        logger.debug('STDERR:', stderr)
     clonify_bin = os.path.join(bin_dir, 'clonify')
     if not os.path.isfile(clonify_bin):
         err = 'ERROR: It appears that compiling the Clonify binary has failed, '
