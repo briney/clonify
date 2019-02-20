@@ -627,12 +627,12 @@ def compile_clonify_binary(args):
     with open(os.path.join(bin_dir, 'clonify.cc'), 'w') as f:
         f.write(ccdata)
     make_cmd = 'cd {} && make'.format(bin_dir)
-    p = sp.Popen(make_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+    p = sp.Popen(make_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8')
     stdout, stderr = p.communicate()
     if args.debug:
         logger.debug('COMPILATION OUTPUT')
-        logger.debug('STDOUT:', stdout)
-        logger.debug('STDERR:', stderr)
+        logger.debug('STDOUT:', stdout.decode())
+        logger.debug('STDERR:', stderr.decode())
     clonify_bin = os.path.join(bin_dir, 'clonify')
     if not os.path.isfile(clonify_bin):
         err = 'ERROR: It appears that compiling the Clonify binary has failed, '
@@ -849,7 +849,7 @@ def run_clonify(clonify_bin, seq_file, lineage_dir, args):
     # need to name for the clonify C++ program, and should put it
     # in a location on my $PATH so that I can call it directly.
     clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
-    p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+    p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8')
     stdout, stderr = p.communicate()
     logger.debug(stdout.strip())
     logger.debug(stderr)
