@@ -63,3 +63,4 @@ target/
 
 
 *.sublime-*
+clonify/src/.DS_Store
