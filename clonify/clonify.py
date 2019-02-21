@@ -715,58 +715,58 @@ def cluster_vj_groups(groups, clonify_db, args):
     ## Also, we remove the clustering_temp directory upon completion, which shouldn't be done if this
     ## function is going to be parallelized with Celery/multiprocessing
 
-    # cluster_dir = os.path.join(args.temp, 'vj_clusters')
-    # make_dir(cluster_dir)
-    # cluster_temp = os.path.join(args.temp, 'clustering_temp')
-    # make_dir(cluster_temp)
-    # start = datetime.now()
-    # for i, group in enumerate(groups):
-    #     v, j = os.path.basename(group).split('_')
-    #     progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
-    #     clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True,
-    #                        make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
-    #     for num, id_list in enumerate(clusters):
-    #         cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
-    #         seqs = clonify_db.get_sequences_by_id(id_list)
-    #         with open(cluster_file, 'wb') as f:
-    #             pickle.dump(seqs, f, protocol=2)
-    # progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
-    # if not args.debug:
-    #     shutil.rmtree(cluster_temp)
-    # return cluster_dir
-
-
     cluster_dir = os.path.join(args.temp, 'vj_clusters')
     make_dir(cluster_dir)
     cluster_temp = os.path.join(args.temp, 'clustering_temp')
     make_dir(cluster_temp)
     start = datetime.now()
-    p = mp.Pool(maxtasksperchild=10)
-    async_results = []
-    for group in groups:
+    for i, group in enumerate(groups):
         v, j = os.path.basename(group).split('_')
-        async_results.append(p.apply_async(cluster_single_vj_group, args=(group,
-                                                                          cluster_dir,
-                                                                          v,
-                                                                          j,
-                                                                          clonify_db,
-                                                                          args.clustering_threshold,
-                                                                          args.clustering_memory_allocation)))
-    monitor_mp_jobs(async_results, start_time=start)    
+        progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
+        clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True,
+                           make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
+        for num, id_list in enumerate(clusters):
+            cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
+            seqs = clonify_db.get_sequences_by_id(id_list)
+            with open(cluster_file, 'wb') as f:
+                pickle.dump(seqs, f, protocol=2)
+    progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
     if not args.debug:
         shutil.rmtree(cluster_temp)
     return cluster_dir
 
 
-def cluster_single_vj_group(group, cluster_dir, v, j, clonify_db, threshold, memory_allocation):
-    v, j = os.path.basename(group).split('_')
-    clusters = cluster(group, threshold=threshold, return_just_seq_ids=True, threads=1,
-                       make_db=False, max_memory=memory_allocation, quiet=True)
-    for num, id_list in enumerate(clusters):
-        cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
-        seqs = clonify_db.get_sequences_by_id(id_list)
-        with open(cluster_file, 'wb') as f:
-            pickle.dump(seqs, f, protocol=2)
+#     cluster_dir = os.path.join(args.temp, 'vj_clusters')
+#     make_dir(cluster_dir)
+#     cluster_temp = os.path.join(args.temp, 'clustering_temp')
+#     make_dir(cluster_temp)
+#     start = datetime.now()
+#     p = mp.Pool(maxtasksperchild=10)
+#     async_results = []
+#     for group in groups:
+#         v, j = os.path.basename(group).split('_')
+#         async_results.append(p.apply_async(cluster_single_vj_group, args=(group,
+#                                                                           cluster_dir,
+#                                                                           v,
+#                                                                           j,
+#                                                                           clonify_db,
+#                                                                           args.clustering_threshold,
+#                                                                           args.clustering_memory_allocation)))
+#     monitor_mp_jobs(async_results, start_time=start)    
+#     if not args.debug:
+#         shutil.rmtree(cluster_temp)
+#     return cluster_dir
+
+
+# def cluster_single_vj_group(group, cluster_dir, v, j, clonify_db, threshold, memory_allocation):
+#     v, j = os.path.basename(group).split('_')
+#     clusters = cluster(group, threshold=threshold, return_just_seq_ids=True, threads=1,
+#                        make_db=False, max_memory=memory_allocation, quiet=True)
+#     for num, id_list in enumerate(clusters):
+#         cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
+#         seqs = clonify_db.get_sequences_by_id(id_list)
+#         with open(cluster_file, 'wb') as f:
+#             pickle.dump(seqs, f, protocol=2)
 
 
 def clonify(clonify_bin, seq_files, lineage_dir, args):
