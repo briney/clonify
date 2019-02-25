@@ -816,7 +816,7 @@ def run_clonify_via_multiprocessing(clonify_bin, seq_files, lineage_dir, args):
                                                              f,
                                                              lineage_dir,
                                                              args))])
-    monitor_mp_jobs([a[1] for a in async_results])
+    monitor_mp_jobs([a[1] for a in async_results], start_time=start)
     sizes = []
     for a in async_results:
         try:
