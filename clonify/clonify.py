@@ -784,7 +784,7 @@ def clonify(clonify_bin, seq_files, lineage_dir, args):
         logger.info('')
         logger.info('Running Clonify jobs via Celery...')
         sizes = run_clonify_via_celery(clonify_bin, seq_files, lineage_dir, args)
-    elif any([args.debug, args.clonify_threads == 1]):
+    elif any([args.debug, args.clonify_processes == 1]):
         logger.info('')
         logger.info('Running Clonify...')
         sizes = run_clonify_singlethreaded(clonify_bin, seq_files, lineage_dir, args)
@@ -844,15 +844,17 @@ def run_clonify(clonify_bin, seq_file, lineage_dir, args):
     '''
     with open(seq_file, 'rb') as f:
         seqs = pickle.load(f)
+    if not seqs:
+        return []
     seq_ids = [s['seq_id'] for s in seqs]
     if len(seq_ids) == 1:
-        return []
+        lineage = Lineage(seq_id=seq_ids[0])
+        lineage.write(lineage_dir)
+        return [1, ]
     clonify_dir = os.path.join(args.temp, 'clonify')
     make_dir(clonify_dir)
     json_file = pretty_json(seqs, as_file=True, temp_dir=clonify_dir)
     cluster_file = json_file + '_cluster'
-    # need to name for the clonify C++ program, and should put it
-    # in a location on my $PATH so that I can call it directly.
     clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
     p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8')
     stdout, stderr = p.communicate()
