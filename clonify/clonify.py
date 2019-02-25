@@ -133,6 +133,10 @@ def parse_args():
                         help="Bonus applied for shared mutations. Default is 0.35.")
     parser.add_argument('--length-penalty', dest='length_penalty', default=2, type=int,
                         help="Penalty for differences in CDR3 length (per AA). Default is 2.")
+    parser.add_argument('--clonify-processes', dest='clonify_processes', default=1, type=int,
+                        help="Number of simltaneous process with which to run the Clonify binary. Default is '1', \
+                        whic is highly recommended when using the standard binary, as it consumes a fair amount of memory \
+                        and already uses all local cores using OpenMP.")
     parser.add_argument('-C', '--celery', dest="celery", default=False, action='store_true',
                         help="NOT YET IMPLEMENTED. Use if performing computation on a Celery cluster. \
                         If set, input files will be split into many subfiles and passed \
@@ -160,7 +164,7 @@ class Args(object):
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
         clustering_memory_allocation=800, clustering_field='vdj_nt', distance_cutoff=0.35, shared_mutation_bonus=0.35,
-        length_penalty=2, celery=False, update=True, debug=False):
+        length_penalty=2, clonify_processes=1, celery=False, update=True, debug=False):
         
         super(Args, self).__init__()
         
@@ -188,6 +192,7 @@ class Args(object):
         self.distance_cutoff = float(distance_cutoff)
         self.shared_mutation_bonus = float(shared_mutation_bonus)
         self.length_penalty = int(length_penalty)
+        self.clonify_processes = clonify_processes
         self.celery = celery
         self.update = update
         self.debug = debug
@@ -779,7 +784,7 @@ def clonify(clonify_bin, seq_files, lineage_dir, args):
         logger.info('')
         logger.info('Running Clonify jobs via Celery...')
         sizes = run_clonify_via_celery(clonify_bin, seq_files, lineage_dir, args)
-    elif any([args.debug, ]):
+    elif any([args.debug, args.clonify_threads == 1]):
         logger.info('')
         logger.info('Running Clonify...')
         sizes = run_clonify_singlethreaded(clonify_bin, seq_files, lineage_dir, args)
