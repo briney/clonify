@@ -196,6 +196,7 @@ class Args(object):
         self.clustering_field = clustering_field
         self.preclustering = preclustering
         self.clustering_memory_allocation = int(clustering_memory_allocation)
+        self.clustering_processes = clustering_processes
         self.distance_cutoff = float(distance_cutoff)
         self.shared_mutation_bonus = float(shared_mutation_bonus)
         self.length_penalty = int(length_penalty)
