@@ -742,6 +742,7 @@ def cluster_vj_groups(groups, clonify_db, args):
         progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
     # multiprocessing of CD-HIT, one CPU per processes
     else:
+        clonify_db.close()
         processes = mp.cpu_count() if args.clustering_processes == 0 else args.clustering_processes
         p = mp.Pool(processes, maxtasksperchild=1)
         async_results = []
@@ -759,7 +760,7 @@ def cluster_vj_groups(groups, clonify_db, args):
 def cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_db, args):
     v, j = os.path.basename(group).split('_')
     clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True, temp_dir=cluster_temp,
-                        make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
+                        make_db=False, max_memory=args.clustering_memory_allocation, quiet=True, debug=args.debug)
     for num, id_list in enumerate(clusters):
         cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
         seqs = clonify_db.get_sequences_by_id(id_list)
