@@ -732,20 +732,38 @@ def cluster_vj_groups(groups, clonify_db, args):
     cluster_temp = os.path.join(args.temp, 'clustering_temp')
     make_dir(cluster_temp)
     start = datetime.now()
-    for i, group in enumerate(groups):
-        v, j = os.path.basename(group).split('_')
-        progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
-        clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True,
-                           make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
-        for num, id_list in enumerate(clusters):
-            cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
-            seqs = clonify_db.get_sequences_by_id(id_list)
-            with open(cluster_file, 'wb') as f:
-                pickle.dump(seqs, f, protocol=2)
-    progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
+    # one CD-HIT clustering processes
+    if args.clustering_processes == 1:
+        for i, group in enumerate(groups):
+            v, j = os.path.basename(group).split('_')
+            progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
+            cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_df, args)
+        progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
+    # multiprocessing of CD-HIT, one CPU per processes
+    else:
+        processes = mp.cpu_count() if args.clustering_processes == 0 else args.clustering_processes
+        p = mp.Pool(processes, maxtasksperchild=1)
+        async_results = []
+        for group in groups:
+            ar = p.apply_async(cluster_single_vj_group, args=(group, cluster_dir, cluster_temp, clonify_db, args))
+            async_results.append(ar)
+        monitor_mp_jobs(async_results)
+        p.close()
+        p.join()
     if not args.debug:
         shutil.rmtree(cluster_temp)
     return cluster_dir
+
+
+def cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_db, args):
+    v, j = os.path.basename(group).split('_')
+    clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True, temp_dir=cluster_temp,
+                        make_db=False, max_memory=args.clustering_memory_allocation, quiet=True)
+    for num, id_list in enumerate(clusters):
+        cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
+        seqs = clonify_db.get_sequences_by_id(id_list)
+        with open(cluster_file, 'wb') as f:
+            pickle.dump(seqs, f, protocol=2)
 
 
 #     cluster_dir = os.path.join(args.temp, 'vj_clusters')
