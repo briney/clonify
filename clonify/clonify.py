@@ -738,7 +738,7 @@ def cluster_vj_groups(groups, clonify_db, args):
         for i, group in enumerate(groups):
             v, j = os.path.basename(group).split('_')
             progbar.progress_bar(i, len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
-            cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_df, args)
+            cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_db, args)
         progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
     # multiprocessing of CD-HIT, one CPU per processes
     else:
