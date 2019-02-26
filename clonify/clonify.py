@@ -222,7 +222,7 @@ def validate_args(args):
 
     for d in [args.output, args.temp]:
         if d is not None:
-            make_dir(d)
+            make_dir(os.path.abspath(d))
 
 
 
