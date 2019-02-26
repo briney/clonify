@@ -123,8 +123,14 @@ def parse_args():
     parser.add_argument('--clustering-field', default='vdj_nt', choices=['vdj_nt', 'cdr3_nt'],
                         help="Field used for clustering sequences in each VJ group. Choices are: \
                         'vdj_nt' and 'cdr3_nt'. Default is 'vdj_nt'.")
-    parser.add_argument('--clustering-memory-allocation', default=800, type=int,
+    parser.add_argument('--clustering-memory-allocation', default=2000, type=int,
                         help='Amount of memory allocated to CD-HIT for clustering of VJ groups, in MB. Default is 800')
+    parser.add_argument('--clustering-processes', dest='clustering_processes', default=0, type=int,
+                        help="Number of processes to perform CD-HIT clustering of V/J groups. Default is '0', which results \
+                        in using all available cores. If set to anything other than '1', each CD-HIT process will be limited \
+                        to using one core. If set to '1', the single CD-HIT process will be allowed to use all cores. This can \
+                        potentially be beneficial when VJ groups are quite divergent in size (such that a single large VJ group \
+                        running on a single core outweight the benefits of running multiple CD-HIT processes in parallel).")
     # The following option ('-x') doesn't do anything at the moment.
     parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
                         help="The cutoff normalized Levenshtein distance (nLD) for segregating \
@@ -163,8 +169,9 @@ class Args(object):
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
-        clustering_memory_allocation=800, clustering_field='vdj_nt', distance_cutoff=0.35, shared_mutation_bonus=0.35,
-        length_penalty=2, clonify_processes=1, celery=False, update=True, debug=False):
+        clustering_memory_allocation=800, clustering_field='vdj_nt', clustering_processes=0,
+        distance_cutoff=0.35, shared_mutation_bonus=0.35, length_penalty=2, clonify_processes=1, 
+        celery=False, update=True, debug=False):
         
         super(Args, self).__init__()
         
@@ -809,7 +816,7 @@ def run_clonify_singlethreaded(clonify_bin, seq_files, lineage_dir, args):
 
 def run_clonify_via_multiprocessing(clonify_bin, seq_files, lineage_dir, args):
     start = datetime.now()
-    p = mp.Pool(maxtasksperchild=50)
+    p = mp.Pool(maxtasksperchild=1)
     async_results = []
     for f in seq_files:
         async_results.append([f, p.apply_async(run_clonify, (clonify_bin,
