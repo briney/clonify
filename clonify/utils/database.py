@@ -45,9 +45,9 @@ class ClonifyDB(SQLiteDatabase):
     """
     
     def __init__(self, name=None, direc=None, in_memory=False, table_name=None, clustering_field='vdj_nt'):
+        self.clustering_field = clustering_field
         super(ClonifyDB, self).__init__(name=name, direc=direc,
                                         in_memory=in_memory, table_name=table_name)
-        self.clustering_field = clustering_field
 
 
     @property
