@@ -629,7 +629,7 @@ def compile_clonify_binary(args):
     src_dir = os.path.join(pkg_dir, 'src/clonify')
     makefile = os.path.join(src_dir, 'Makefile')
     ccfile = os.path.join(src_dir, 'clonify.cc')
-    bin_dir = os.path.join(args.temp, 'bin')
+    bin_dir = os.path.join(os.path.expanduser("~"), '.clonify')
     make_dir(bin_dir)
     # copy makefile, edit cpp file to include proper clustering parameters
     shutil.copy(makefile, bin_dir)
