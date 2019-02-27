@@ -132,7 +132,7 @@ def parse_args():
                         potentially be beneficial when VJ groups are quite divergent in size (such that a single large VJ group \
                         running on a single core outweight the benefits of running multiple CD-HIT processes in parallel).")
     # The following option ('-x') doesn't do anything at the moment.
-    parser.add_argument('-x', '--dist', dest='distance-cutoff', default=0.32, type=float,
+    parser.add_argument('-x', '--distance_cutoff', dest='distance_cutoff', default=0.32, type=float,
                         help="The cutoff normalized Levenshtein distance (nLD) for segregating \
                         sequences into clonal families. Default is 0.32.")
     parser.add_argument('--shared-mutation-bonus', dest='shared_mutation_bonus', default=0.65, type=float,
