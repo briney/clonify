@@ -252,9 +252,12 @@ def get_sequences(group, args):
         seqs = seqio.from_mongodb(args.db, collection=group,
                                   ip=args.ip, port=args.port,
                                   user=args.user, password=args.password,
-                                  query=QUERY, projection=PROJECTION, verbose=True)
+                                  query=QUERY, projection=PROJECTION,
+                                  seq_field=args.clustering_field, verbose=True)
     elif args.json is not None:
-        seqs = seqio.from_json(group, verbose=True)
+        seqs = seqio.from_json(group,
+                               seq_field=args.clustering_field,
+                               verbose=True)
     return seqs.as_generator
 
 
