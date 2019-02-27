@@ -36,6 +36,7 @@ import os
 import random
 import shutil
 import sqlite3
+import stat
 import subprocess as sp
 import sys
 import tempfile
@@ -660,6 +661,9 @@ def compile_clonify_binary(args):
         err += stderr
         print(error)
         sys.exit(1)
+    else:
+        st = os.stat(clonify_bin)
+        os.chmod(clonify_bin, st.st_mode | stat.S_IEXEC)
     return os.path.abspath(clonify_bin)
 
 
