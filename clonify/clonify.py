@@ -47,9 +47,9 @@ import urllib.request, urllib.parse, urllib.error
 import numpy as np
 
 from abutils.core.sequence import Sequence
-from abutils.utils import log, mongodb, progbar
+from abutils.utils import log, mongodb, progbar, seqio
 from abutils.utils.cluster import cluster
-from abutils.utils.inputs import read_input
+# from abutils.utils.inputs import read_input
 from abutils.utils.jobs import monitor_mp_jobs
 from abutils.utils.pipeline import list_files, make_dir
 # from abtools.queue.celery import celery
@@ -132,11 +132,11 @@ def parse_args():
                         potentially be beneficial when VJ groups are quite divergent in size (such that a single large VJ group \
                         running on a single core outweight the benefits of running multiple CD-HIT processes in parallel).")
     # The following option ('-x') doesn't do anything at the moment.
-    parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
+    parser.add_argument('-x', '--dist', dest='distance-cutoff', default=0.32, type=float,
                         help="The cutoff normalized Levenshtein distance (nLD) for segregating \
                         sequences into clonal families. Default is 0.32.")
-    parser.add_argument('--shared-mutation-bonus', dest='shared_mutation_bonus', default=0.32, type=float,
-                        help="Bonus applied for shared mutations. Default is 0.35.")
+    parser.add_argument('--shared-mutation-bonus', dest='shared_mutation_bonus', default=0.65, type=float,
+                        help="Bonus applied for shared mutations. Default is 0.65.")
     parser.add_argument('--length-penalty', dest='length_penalty', default=2, type=int,
                         help="Penalty for differences in CDR3 length (per AA). Default is 2.")
     parser.add_argument('--clonify-processes', dest='clonify_processes', default=1, type=int,
@@ -248,12 +248,13 @@ def get_sequences(group, args):
     if args.sequences is not None:
         return args.sequences
     if args.db is not None:
-        seqs = read_input(args.db, 'mongodb', collection=group,
-                          mongo_ip=args.ip, mongo_port=args.port,
-                          mongo_user=args.user, mongo_password=args.password,
-                          query=QUERY, projection=PROJECTION)
+        PROJECTION[args.clustering_field] = 1
+        seqs = seqio.from_mongodb(args.db, collection=group,
+                                  ip=args.ip, port=args.port,
+                                  user=args.user, password=args.password,
+                                  query=QUERY, projection=PROJECTION, verbose=True)
     elif args.json is not None:
-        seqs = read_input(group, 'json')
+        seqs = seqio.from_json(group, verbose=True)
     return seqs.as_generator
 
 
@@ -425,8 +426,10 @@ def update_json(lineage_files, group, args):
 
 
 QUERY = {'prod': 'yes', 'chain': 'heavy'}
+# note that the projection includes only the stuff required for running the actual Clonify binary
+# field(s) required for clustering, etc are added later (in the INPUTS section)
 PROJECTION = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
-              'v_gene.full': 1, 'j_gene.full': 1,'cdr3_nt': 1, 'vdj_nt': 1, 'vdj_aa': 1, 'var_muts_nt': 1}
+              'v_gene.full': 1, 'j_gene.full': 1, 'var_muts_nt': 1}
 
 def get_mongo_database(args):
     return mongodb.get_db(args.db, ip=args.ip, port=args.port,
@@ -569,7 +572,7 @@ def update_sequences(lineage_files, args):
 def build_clonify_db(sequences, args):
     logger.info('')
     logger.info('Building a SQLite database of Sequence data...')
-    clonifydb = ClonifyDB('clonify_db', args.temp)
+    clonifydb = ClonifyDB('clonify_db', args.temp, clustering_field=args.clustering_field)
     clonifydb.insert(sequences)
     clonifydb.commit()
     logger.info('Indexing...')

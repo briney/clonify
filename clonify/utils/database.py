@@ -44,20 +44,21 @@ class ClonifyDB(SQLiteDatabase):
     Database for storing Clonify sequence information
     """
     
-    def __init__(self, name=None, direc=None, in_memory=False, table_name=None):
+    def __init__(self, name=None, direc=None, in_memory=False, table_name=None, clustering_field='vdj_nt'):
         super(ClonifyDB, self).__init__(name=name, direc=direc,
                                         in_memory=in_memory, table_name=table_name)
+        self.clustering_field = clustering_field
 
 
     @property
     def structure(self):
         return [('id', 'text'), ('vgene', 'text'), ('jgene', 'text'),
-                ('cdr3_nt', 'text'), ('vdj_nt', 'text'), ('sequence', 'text')]
+                (self.clustering_field, 'text'), ('sequence', 'text')]
 
     
     @property
     def fields(self):
-        return [['seq_id'], ['v_gene', 'gene'], ['j_gene', 'gene'], ['cdr3_nt'], ['vdj_nt']]
+        return [['seq_id'], ['v_gene', 'gene'], ['j_gene', 'gene'], [self.clustering_field]]
 
     
     @property
@@ -112,15 +113,15 @@ class ClonifyDB(SQLiteDatabase):
 
 
 
-    def get_cdr3s_for_vj_group(self, v, j):
-        '''
+    # def get_cdr3s_for_vj_group(self, v, j):
+    #     '''
 
-        '''
-        query_str = '''SELECT {0}.id, {0}.cdr3_nt, {0}.vgene, {0}.jgene
-                       FROM {0}
-                       WHERE {0}.vgene LIKE ? and {0}.jgene LIKE ?'''.format(self.table_name)
-        results = self.cursor.execute(query_str, (v, j))
-        return [(r[0], r[1]) for r in results]
+    #     '''
+    #     query_str = '''SELECT {0}.id, {0}.cdr3_nt, {0}.vgene, {0}.jgene
+    #                    FROM {0}
+    #                    WHERE {0}.vgene LIKE ? and {0}.jgene LIKE ?'''.format(self.table_name)
+    #     results = self.cursor.execute(query_str, (v, j))
+    #     return [(r[0], r[1]) for r in results]
 
 
     def get_seqs_for_vj_group(self, v, j, clustering_field):
