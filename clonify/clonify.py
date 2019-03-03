@@ -121,9 +121,9 @@ def parse_args():
     parser.add_argument('--clustering-threshold', default=0.65, type=float,
                         help="Threshold to be used when clustering VJ groups of sequences. \
                         Default is 0.65.")
-    parser.add_argument('--clustering-field', default='cdr3_nt', choices=['vdj_nt', 'cdr3_nt'],
+    parser.add_argument('--clustering-field', default='cdr3_nt', choices=['cdr3_nt', 'vdj_nt'],
                         help="Field used for clustering sequences in each VJ group. Choices are: \
-                        'vdj_nt' and 'cdr3_nt'. Default is 'cdr3_nt'.")
+                        'cdr3_nt' and 'vdj_nt'. Default is 'cdr3_nt'.")
     parser.add_argument('--clustering-memory-allocation', default=2000, type=int,
                         help='Amount of memory allocated to CD-HIT for clustering of VJ groups, in MB. Default is 800')
     parser.add_argument('--clustering-processes', dest='clustering_processes', default=0, type=int,
@@ -249,7 +249,6 @@ def get_sequences(group, args):
     if args.sequences is not None:
         return args.sequences
     if args.db is not None:
-        PROJECTION[args.clustering_field] = 1
         seqs = seqio.from_mongodb(args.db, collection=group,
                                   ip=args.ip, port=args.port,
                                   user=args.user, password=args.password,
@@ -433,7 +432,7 @@ QUERY = {'prod': 'yes', 'chain': 'heavy'}
 # note that the projection includes only the stuff required for running the actual Clonify binary
 # field(s) required for clustering, etc are added later (in the INPUTS section)
 PROJECTION = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
-              'v_gene.full': 1, 'j_gene.full': 1, 'var_muts_nt': 1}
+              'cdr3_nt': 1, 'vdj_nt': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'var_muts_nt': 1}
 
 def get_mongo_database(args):
     return mongodb.get_db(args.db, ip=args.ip, port=args.port,
