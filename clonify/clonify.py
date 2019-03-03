@@ -258,7 +258,7 @@ def get_sequences(group, args):
         seqs = seqio.from_json(group,
                                seq_field=args.clustering_field,
                                verbose=True)
-    return seqs.as_generator
+    return seqs.as_list
 
 
 
