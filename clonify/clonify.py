@@ -118,6 +118,9 @@ def parse_args():
                         help="If set, will not perform pre-clustering by V/J genes and CDR3 homology. \
                         For small datasets this may improve accuracy, but for large datasets this will result \
                         in much longer runtimes (and possibly failure).")
+    parser.add_argument('--only-productive', dest='only_productive', action='store_true', default=False,
+                        help="If set, clonify will only consider sequences that abstar has annotated as 'productive'. \
+                        Default is `False`.")
     parser.add_argument('--clustering-threshold', default=0.65, type=float,
                         help="Threshold to be used when clustering VJ groups of sequences. \
                         Default is 0.65.")
@@ -170,7 +173,7 @@ class Args(object):
         selection_prefix=None, selection_prefix_split=None, selection_prefix_split_pos=0,
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
-        clustering_memory_allocation=800, clustering_field='vdj_nt', clustering_processes=0,
+        only_productive=False, clustering_memory_allocation=800, clustering_field='vdj_nt', clustering_processes=0,
         distance_cutoff=0.35, shared_mutation_bonus=0.35, length_penalty=2, clonify_processes=1, 
         celery=False, update=True, debug=False):
         
@@ -196,6 +199,7 @@ class Args(object):
         self.clustering_threshold = clustering_threshold
         self.clustering_field = clustering_field
         self.preclustering = preclustering
+        self.only_productive = only_productive
         self.clustering_memory_allocation = int(clustering_memory_allocation)
         self.clustering_processes = clustering_processes
         self.distance_cutoff = float(distance_cutoff)
@@ -246,13 +250,18 @@ def get_input_groups(args):
 
 
 def get_sequences(group, args):
+    query = {'chain': 'heavy'}
+    if args.only_productive:
+        query['prod'] = 'yes'
+    projection = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
+                'cdr3_nt': 1, 'vdj_nt': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'var_muts_nt': 1}
     if args.sequences is not None:
         return args.sequences
     if args.db is not None:
         seqs = seqio.from_mongodb(args.db, collection=group,
                                   ip=args.ip, port=args.port,
                                   user=args.user, password=args.password,
-                                  query=QUERY, projection=PROJECTION,
+                                  query=query, projection=projection,
                                   seq_field=args.clustering_field, verbose=True)
     elif args.json is not None:
         seqs = seqio.from_json(group,
@@ -427,12 +436,6 @@ def update_json(lineage_files, group, args):
 #
 ################################
 
-
-QUERY = {'prod': 'yes', 'chain': 'heavy'}
-# note that the projection includes only the stuff required for running the actual Clonify binary
-# field(s) required for clustering, etc are added later (in the INPUTS section)
-PROJECTION = {'_id': 0, 'seq_id': 1, 'v_gene.gene': 1, 'j_gene.gene': 1, 'junc_aa': 1,
-              'cdr3_nt': 1, 'vdj_nt': 1, 'v_gene.full': 1, 'j_gene.full': 1, 'var_muts_nt': 1}
 
 def get_mongo_database(args):
     return mongodb.get_db(args.db, ip=args.ip, port=args.port,
