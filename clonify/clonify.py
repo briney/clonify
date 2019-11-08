@@ -1356,7 +1356,7 @@ def print_group_info(group, num, num_groups, args):
     logger.info(gstring)
     logger.info('=' * len(gstring))
     logger.info('')
-    logger.info('group {} of {}'.format())
+    logger.info('group {} of {}'.format(num, num_groups))
     logger.info('')
     logger.info('\n'.join(group))
     logger.info('')
