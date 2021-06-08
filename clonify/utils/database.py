@@ -23,9 +23,12 @@
 
 
 import os
-import sqlite3
 import sys
 import time
+
+from abutils.core.sequence import Sequence
+from abutils.utils.database import SQLiteDatabase
+from abutils.utils.utilities import nested_dict_lookup
 
 if sys.version_info[0] > 2:
     STR_TYPES = [str, ]
@@ -35,202 +38,189 @@ else:
     import cPickle as pickle
 
 
-class Database(object):
-    """docstring for Database"""
-    def __init__(self, name=None, direc=None, in_memory=False):
-        super(Database, self).__init__()
-        self.name = name
-        if all([name is not None, direc is not None]):
-            self.dir = os.path.abspath(direc)
-            self.path = os.path.join(self.dir, self.name)
-        elif in_memory:
-            self.dir = None
-            self.path = ':memory:'
-        self.table_name = 'seqs'
-        self.structure = [('key', 'text'), ('value', 'text')]
-        self.initialized = False
-        self._connection = None
-        self._cursor = None
-        self._create_table_cmd = None
-        self._insert_cmd = None
-        if not self.initialized:
-            self.create_table()
 
-    def __getitem__(self, key):
-        return self.find_one(key)
-
-    def __setitem__(self, key, value):
-        return self.insert_one(key, value)
+class ClonifyDB(SQLiteDatabase):
+    """
+    Database for storing Clonify sequence information
+    """
+    
+    def __init__(self, name=None, direc=None, in_memory=False, table_name=None, clustering_field='vdj_nt'):
+        self.clustering_field = clustering_field
+        super(ClonifyDB, self).__init__(name=name, direc=direc,
+                                        in_memory=in_memory, table_name=table_name)
 
 
     @property
-    def connection(self):
-        if self._connection is None:
-            self._connection = sqlite3.connect(self.path)
-        return self._connection
+    def structure(self):
+        return [('id', 'text'), ('vgene', 'text'), ('jgene', 'text'),
+                (self.clustering_field, 'text'), ('sequence', 'text')]
 
-    @connection.setter
-    def connection(self, connection):
-        self._connection = connection
-
-
+    
     @property
-    def cursor(self):
-        if self._cursor is None:
-            self._cursor = self.connection.cursor()
-        return self._cursor
+    def fields(self):
+        return [['seq_id'], ['v_gene', 'gene'], ['j_gene', 'gene'], [self.clustering_field]]
 
-    @cursor.setter
-    def cursor(self, cursor):
-        self._cursor = cursor
-
-
-    @property
-    def create_table_cmd(self):
-        if self._create_table_cmd is None:
-            field_string = ', '.join([' '.join(s) for s in self.structure])
-            self._create_table_cmd = 'CREATE TABLE {} ({})'.format(self.table_name,
-                field_string)
-        return self._create_table_cmd
-
-
+    
     @property
     def insert_cmd(self):
-        if self._insert_cmd is None:
-            self._insert_cmd = 'INSERT INTO {} VALUES ({})'.format(self.table_name,
+        return 'INSERT INTO {} VALUES ({})'.format(self.table_name,
                 ','.join(['?'] * len(self.structure)))
-        return self._insert_cmd
-
-
-    def commit(self):
-        self.connection.commit()
-
-
-    def close(self):
-        self.connection.close()
-        del self._cursor
-        del self._connection
-        self._cursor = None
-        self._connection = None
-
-
-    def create_table(self):
-        self.cursor.execute('DROP TABLE IF EXISTS {}'.format(self.table_name))
-        self.cursor.execute(self.create_table_cmd)
-        self.initialized = True
-
-
-    def insert_one(self, key, value):
+    
+    
+    def insert_one(self, sequence):
         '''
-        Inserts a single key/value pair
+        Inserts a single entry.
 
-        Inputs:
-          key - the key
-          value - the value
+        Args:
+
+            data (list or dict): Either a list containing data fields (in order) or a dict
+                with column/value mappings.
         '''
+        data = [nested_dict_lookup(sequence, f) for f in self.fields]
+        data.append(pickle.dumps(sequence))
         with self.connection as conn:
-            conn.execute(self.insert_cmd, (key, pickle.dumps(value, protocol=0)))
+            conn.execute(self.insert_cmd, data)
 
 
-    def insert_many(self, data):
+    def insert_many(self, sequences):
         '''
-        Inserts multiple key/value pairs.
+        Inserts multiple entries.
 
-        Inputs:
-          data - a list/generator of iterables (lists or tuples) with each iterable containing
-                a single key/value pair.
+        Args:
+
+            data (list): Either a nested list of data fields (in order) or a list of dicts
+                with column/value mappings.
         '''
-        # for kv in data:
-        #     if len(kv) != len(self.structure):
-        #         err = 'Mismatch between one of the supplied values:\n{}\n'.format(kv)
-        #         err += 'and the structure of the table:\n{}'.format(self.structure)
-        #         raise RuntimeError(err)
-        data = ((d[0], pickle.dumps(d[1], protocol=0)) for d in data)
+
+        ## TODO: sequences might be a generator (huge) and we're consuming it to make the data list.
+        ## would be cool if making data was also a generator (feeding executemany) or did many 
+        ## execute operations without closing the transaction between them.
+
+        data = []
+        for s in sequences:
+            d = [nested_dict_lookup(s, f) for f in self.fields]
+            d.append(pickle.dumps(s))
+            data.append(d)
         with self.connection as conn:
             conn.executemany(self.insert_cmd, data)
 
 
-    def find_one(self, key):
+    def insert(self, sequences):
+        if type(sequences) in [Sequence, dict]:
+            sequences = [sequences, ]
+        self.insert_many(sequences)
+
+
+
+
+    # def get_cdr3s_for_vj_group(self, v, j):
+    #     '''
+
+    #     '''
+    #     query_str = '''SELECT {0}.id, {0}.cdr3_nt, {0}.vgene, {0}.jgene
+    #                    FROM {0}
+    #                    WHERE {0}.vgene LIKE ? and {0}.jgene LIKE ?'''.format(self.table_name)
+    #     results = self.cursor.execute(query_str, (v, j))
+    #     return [(r[0], r[1]) for r in results]
+
+
+    def get_seqs_for_vj_group(self, v, j, clustering_field):
         '''
-        Searches a SQLite database.
 
-        Inputs:
-          key - a single key (as a string)
-
-        Returns: a single unpickled value
         '''
-        self.cursor.execute(
-            '''SELECT seqs.key, seqs.value
-               FROM seqs
-               WHERE seqs.key LIKE ?''', (key, ))
-        return pickle.loads(self.cursor.fetchone()[1])
+        query_str = '''SELECT {0}.id, {0}.{1}, {0}.vgene, {0}.jgene
+                       FROM {0}
+                       WHERE {0}.vgene LIKE ? and {0}.jgene LIKE ?'''.format(self.table_name,
+                                                                             clustering_field)
+        results = self.cursor.execute(query_str, (v, j))
+        return [(r[0], r[1]) for r in results]
 
-
-    def find(self, keys):
+    
+    def get_all_sequences(self):
         '''
-        Searches a SQLite database.
 
-        Inputs:
-          keys - a single key (string) or iterable (list/tuple) containing one or more keys
-
-        Returns: a list of unpickled values
         '''
-        if type(keys) in STR_TYPES:
-            keys = [keys, ]
+        query = '''SELECT {0}.sequence
+                   FROM {0}'''.format(self.table_name)
+        results = self.cursor.execute(query)
+        return [pickle.loads(r[0]) for r in results]
+
+
+    def get_sequences_by_id(self, ids):
+        '''
+
+        '''
+        if type(ids) in STR_TYPES:
+            ids = [ids, ]
         results = []
-        for chunk in self.chunker(keys):
+        for chunk in self.chunker(ids):
             result_chunk = self.cursor.execute(
-                '''SELECT seqs.key, seqs.value
-                   FROM seqs
-                   WHERE seqs.key IN ({})'''.format(','.join('?' * len(chunk))), chunk)
+                '''SELECT {0}.id, {0}.sequence
+                   FROM {0}
+                   WHERE {0}.id IN ({1})'''.format(self.table_name, ','.join('?' * len(chunk))), chunk)
             results.extend(result_chunk)
         return [pickle.loads(r[1]) for r in results]
 
 
-    def find_all(self):
+    def find_distinct(self, field):
         '''
-        Returns all values in a SQLite database.
 
-        Inputs:
-          keys - a single key (string) or iterable (list/tuple) containing one or more keys
-
-        Returns: a list of unpickled values
         '''
-        if type(keys) in STR_TYPES:
-            keys = [keys, ]
-        results = self.cursor.execute(
-            '''SELECT seqs.value
-               FROM seqs''')
-        return [pickle.loads(r[0]) for r in results]
+        query_str = '''SELECT DISTINCT {0}.{1}
+                       FROM {0}'''.format(self.table_name, field)
+        results = self.cursor.execute(query_str)
+        return [r[0] for r in results]
 
 
-    def delete(self, keys):
-        if type(keys) in STR_TYPES:
-            keys = [keys, ]
-        with self.connection as conn:
-            conn.executemany(
-                '''DELETE
-                   FROM seqs
-                   WHERE seqs.key == ?''', keys)
+
+    def find_one(self, where):
+        '''
+        Searches a SQLite database.
+
+        Args:
+
+          key - a single key (as a string)
+
+        Returns: 
+            
+            A single unpickled entry
+        '''
+        where_vals = []
+        wheres = []
+        for k, v in where.items():
+            if type(v) in STR_TYPES:
+                wheres.append('{}.{} LIKE ?'.format(self.table_name, k))
+                where_vals.append(v)
+            else:
+                wheres.append('{}.{} IN ({})'.format(self.table_name, k, ','.join('?' * len(v))))
+                where_vals += v
+        where_str = 'WHERE ' + ' AND '.join(wheres)
+        
+        query_str = '''SELECT *
+                       FROM {}
+                       {}'''.format(select_str, self.table_name, where_str)
+        self.cursor.execute(query_str, wheres)
+        ret = self.cursor.fetchone()
+        vals = [ret[0]] + [pickle.loads(r) for r in ret[1:]]
+        return {k: v for k, v in zip(self.structure)}
 
 
-    def index(self, field='key'):
+
+
+    def index(self, fields='id'):
         '''
         Indexes the database
 
-        Inputs:
-          field - the field on which to create the index. Default is 'key'.
+        Args:
+          
+            fields (str or iterable): the field or list of field on which to create the index.
+                Default is ``'id'``.
         '''
-        index_name = field + '_index'
+        if type(fields) in STR_TYPES:
+            fields = [fields]
+        index_name = '__'.join(fields) + '__index'
         self.cursor.execute('CREATE INDEX {} ON {} ({})'.format(index_name,
             self.table_name,
-            field))
+            ', '.join(fields)))
 
 
-    @staticmethod
-    def chunker(l, n=900):
-        '''
-        Yields successive n-sized chunks from l.
-        '''
-        for i in range(0, len(l), n):
-            yield l[i:i + n]
