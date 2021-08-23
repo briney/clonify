@@ -653,15 +653,15 @@ def compile_clonify_binary(args):
     stdout, stderr = p.communicate()
     if args.debug:
         logger.debug('COMPILATION OUTPUT')
-        logger.debug('STDOUT:', stdout)
-        logger.debug('STDERR:', stderr)
+        logger.debug('STDOUT:\n-------\n{}'.format(stdout))
+        logger.debug('STDERR:\n-------\n{}'.format(stderr))
     clonify_bin = os.path.join(bin_dir, 'clonify')
     if not os.path.isfile(clonify_bin):
         err = 'ERROR: It appears that compiling the Clonify binary has failed, '
         err += 'as the compiled binary does not exist following execution of the make command. '
         err += 'stderr from the make command:\n'
         err += stderr
-        print(error)
+        print(err)
         sys.exit(1)
     else:
         st = os.stat(clonify_bin)
@@ -669,7 +669,7 @@ def compile_clonify_binary(args):
     return os.path.abspath(clonify_bin)
 
 
-## THIS iS FOR THE "OLD" CLONIFY BIN, FROM TOPCODER
+## THIS IS FOR THE "OLD" CLONIFY BIN, FROM TOPCODER
 ## IT REGULARLY FAILS WITH A SEGFAULT, WHICH MAKES IT DIFFICULT TO USE/DEBUG
 # def compile_clonify_binary(args):
 #     # get source directories and files
