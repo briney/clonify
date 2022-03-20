@@ -174,11 +174,11 @@ class Args(object):
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
         only_productive=False, clustering_memory_allocation=800, clustering_field='vdj_nt', clustering_processes=0,
-        distance_cutoff=0.35, shared_mutation_bonus=0.35, length_penalty=2, clonify_processes=1, 
+        distance_cutoff=0.35, shared_mutation_bonus=0.35, length_penalty=2, clonify_processes=1,
         celery=False, update=True, debug=False):
-        
+
         super(Args, self).__init__()
-        
+
         self.json = json
         self.sequences = sequences
         self.db = db
@@ -417,7 +417,7 @@ def update_json(lineage_files, group, args):
         l = Lineage(lineage_file=lf)
         for seq_id in l.seq_ids:
             ldict[seq_id] = l.id
-            sdict[seq_id] = l.size            
+            sdict[seq_id] = l.size
     # update the JSON files
     # TODO
 
@@ -551,7 +551,7 @@ def update_sequences(lineage_files, args):
         l = Lineage(lineage_file=lf)
         for seq_id in l.seq_ids:
             ldict[seq_id] = l.id
-            sdict[seq_id] = l.size            
+            sdict[seq_id] = l.size
     # update the sequence objects
     for s in args.sequences:
         seq_id = s['seq_id']
@@ -740,6 +740,7 @@ def cluster_vj_groups(groups, clonify_db, args):
     ## Also, we remove the clustering_temp directory upon completion, which shouldn't be done if this
     ## function is going to be parallelized with Celery/multiprocessing
 
+    global ar
     cluster_dir = os.path.join(args.temp, 'vj_clusters')
     make_dir(cluster_dir)
     cluster_temp = os.path.join(args.temp, 'clustering_temp')
@@ -760,8 +761,8 @@ def cluster_vj_groups(groups, clonify_db, args):
         async_results = []
         for group in groups:
             ar = p.apply_async(cluster_single_vj_group, args=(group, cluster_dir, cluster_temp, clonify_db, args))
-            async_results.append(ar)
-        monitor_mp_jobs(async_results)
+        async_results.append(ar)
+        monitor_mp_jobs([a for a in async_results])
         p.close()
         p.join()
     if not args.debug:
@@ -771,7 +772,8 @@ def cluster_vj_groups(groups, clonify_db, args):
 
 def cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_db, args):
     v, j = os.path.basename(group).split('_')
-    clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True, temp_dir=cluster_temp,
+    _seqs = get_sequences(group, args)
+    clusters = cluster(_seqs, threshold=args.clustering_threshold, return_just_seq_ids=True, temp_dir=cluster_temp,
                         make_db=False, max_memory=args.clustering_memory_allocation, quiet=True, debug=args.debug)
     for num, id_list in enumerate(clusters):
         cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
@@ -923,7 +925,7 @@ def write_clonify_input(clonify_db, args):
     with open(seq_file, 'wb') as f:
         pickle.dump(list(sequences), f)
     return seq_dir
-     
+
 
 
 def update_clonify_info(lineage_files, group, args):
@@ -948,7 +950,7 @@ def write_clonify_output(lineage_files, clonify_db, group_id, args):
 
 
 
-# OLD VERSION 
+# OLD VERSION
 # -------------
 
 # def clonify(json_files, mr_db, json_db, args):
@@ -1366,7 +1368,7 @@ def print_group_info(group, num, num_groups, args):
 
 
 def print_clonify_results(seq_count, lineage_sizes):
-    gt1_sizes = [l for l in lineage_sizes if l > 1] 
+    gt1_sizes = [l for l in lineage_sizes if l > 1]
     lineage_count = len(gt1_sizes)
     mean = np.mean(gt1_sizes)
     assigned_seq_count = sum(gt1_sizes)
@@ -1381,12 +1383,12 @@ def print_clonify_results(seq_count, lineage_sizes):
 
 def get_logfile(args):
     if args.logfile is None:
-    	if args.output is None:
-    		return os.path.abspath('./{}.log'.format(args.db))
-    	else:
-    		return os.path.abspath(os.path.join(args.output, './{}.log'.format(args.db)))
+        if args.output is None:
+            return os.path.abspath('./{}.log'.format(args.db))
+        else:
+            return os.path.abspath(os.path.join(args.output, './{}.log'.format(args.db)))
     else:
-    	return os.path.abspath(args.logfile)
+        return os.path.abspath(args.logfile)
 
 
 def main(args):
@@ -1420,11 +1422,11 @@ def main(args):
         logger.info('  PRE-CLUSTERING  ')
         logger.info('------------------')
         if args.preclustering:
-            logger.info('Grouping sequences by V/J gene...')
-            vj_group_dir = group_by_vj(clonify_db, args)
-            vj_group_files = list_files(vj_group_dir)
+            logger.info('Grouping sequences by V/J gene...')        # up to here, all good
+            vj_group_dir = group_by_vj(clonify_db, args)            # take the database, the temporary directory and clustering field. Makes up the groups. Return the directory where groups are
+            vj_group_files = list_files(vj_group_dir)               # take the groups and lists them
             logger.info('Clustering sequences within each VJ group...')
-            cluster_dir = cluster_vj_groups(vj_group_files, clonify_db, args)
+            cluster_dir = cluster_vj_groups(vj_group_files, clonify_db, args)   # [fails] input list of files, database and runtime args. Compute clusters and return path of folder with vj clusters
             cluster_files = list_files(cluster_dir)
         else:
             logger.info('Clonify is being run without pre-clustering.')
@@ -1448,15 +1450,15 @@ def main(args):
             logger.info('----------')
             update_clonify_info(lineage_files, group, args)
             logger.info('')
-        
+
         if args.output is not None:
             logger.info('----------')
             logger.info('  OUTPUT  ')
             logger.info('----------')
             write_clonify_output(lineage_files, clonify_db, i, args)
             logger.info('')
-        
-        
+
+
         logger.info('---------------')
         logger.info('  CLEANING UP  ')
         logger.info('---------------')
@@ -1475,7 +1477,7 @@ def main(args):
             clonify_db.destroy()
         else:
             logger.info('Debug mode is ON, so temporary files are not removed.')
-    
+
         logger.info('')
         logger.info('')
         logger.info('')
@@ -1490,7 +1492,7 @@ def main(args):
 
 
     # #==============  OLD  ===============#
-    
+
     # global db
     # db = mongodb.get_db(args.db, args.ip, args.port, args.user, args.password)
     # collection_groups = get_collection_groups(args)
