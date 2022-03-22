@@ -47,6 +47,7 @@ import urllib.request, urllib.parse, urllib.error
 
 import numpy as np
 
+from abutils import io
 from abutils.core.sequence import Sequence
 from abutils.utils import log, mongodb, progbar, seqio
 from abutils.utils.cluster import cluster
@@ -263,13 +264,19 @@ def get_sequences(group, args):
                                   user=args.user, password=args.password,
                                   query=query, projection=projection,
                                   seq_field=args.clustering_field, verbose=True)
+        return seqs.as_list
     elif args.json is not None:
-        seqs = seqio.from_json(group,
-                               seq_field=args.clustering_field,
-                               verbose=True)
-    return seqs.as_list
-
-
+        seqs = []
+        for file in group:
+            logger.info(f'Loading {file} ...')
+            with open(file, 'r') as f:
+                _data = [json.loads(l) for l in f]
+                for d in _data:
+                    j = {'seq_id': d['seq_id'], 'v_gene': {'gene': d['v_gene']['gene'], 'full': d['v_gene']['full']},
+                         'j_gene': {'gene': d['j_gene']['gene'], 'full': d['j_gene']['full']}, 'junc_aa': d['junc_aa'],
+                         'cdr3_nt': d['cdr3_nt'], 'vdj_nt': d['vdj_nt'], 'var_muts_nt': d['var_muts_nt']}
+                    seqs.append(Sequence(j, seq_key=args.clustering_field))
+        return seqs
 
 
 
