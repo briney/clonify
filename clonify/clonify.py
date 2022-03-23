@@ -762,19 +762,21 @@ def cluster_vj_groups(groups, clonify_db, args):
         progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
     # multiprocessing of CD-HIT, one CPU per processes
     else:
-#        logger.info('Closing clonify db ...')
+        logger.info('Closing clonify db ...')
         clonify_db.close()
-        processes = mp.cpu_count() if args.clustering_processes == 0 else args.clustering_processes
-        p = mp.Pool(processes, maxtasksperchild=1)
-        async_results = []
         if not args.debug:
             logger.info('No debug. Clustering vj groups using multiprocessing ...')
-            for group in groups:
-                ar = p.apply_async(cluster_single_vj_group, args=(group, cluster_dir, cluster_temp, clonify_db, args))
-            async_results.append(ar)
-            monitor_mp_jobs([a for a in async_results])
-            p.close()
-            p.join()
+            mp.set_start_method("forkserver")
+            processes = mp.cpu_count() if args.clustering_processes == 0 else args.clustering_processes
+            with mp.Pool(processes, maxtasksperchild=1) as p:
+                async_results = []
+                for group in groups:
+                    ar = p.apply_async(cluster_single_vj_group, args=(group, cluster_dir, cluster_temp, clonify_db, args))
+                async_results.append(ar)
+                monitor_mp_jobs([a for a in async_results])
+                p.close()
+                p.join()
+                p.terminate()
         else:
             logger.info('Debug enabled. Clustering vj groups without multiprocessing ...')
             for group in groups:
