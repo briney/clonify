@@ -914,26 +914,32 @@ def run_clonify(clonify_bin, seq_file, lineage_dir, args):
     make_dir(clonify_dir)
     json_file = pretty_json(seqs, as_file=True, temp_dir=clonify_dir)
     cluster_file = json_file + '_cluster'
-    clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
-    p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8')
-    stdout, stderr = p.communicate()
-    logger.debug(stdout.strip())
-    logger.debug(stderr)
-    if any(['No Sequence in the input file.' in s for s in [stdout, stderr]]):
-        lineages = []
-    else:
-        lineages = Lineages(seq_ids, cluster_file)
-    sizes = []
-    # lineage_files = []
-    for lineage in lineages:
-        sizes.append(lineage.size)
-        lineage.write(lineage_dir)
-    # clean up
-    if not args.debug:
-        os.unlink(json_file)
-        os.unlink(cluster_file)
-    return sizes
 
+    clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
+    with sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8') as p:
+        stdout, stderr = p.communicate()
+        logger.debug(stdout.strip())
+        logger.debug(stderr)
+        lineages = []
+        if any(['No Sequence in the input file.' in s for s in [stdout, stderr]]):
+            pass
+        else:
+            try:
+                lineages = Lineages(seq_ids, cluster_file)
+                sizes = []
+                for lineage in lineages:
+                    sizes.append(lineage.size)
+                    lineage.write(lineage_dir)
+                if not args.debug:
+                    os.unlink(json_file)
+                    os.unlink(cluster_file)
+            except:
+                logger.info('\n')
+                logger.info('uhuh. Something went wrong here...')
+                logger.info(f'JSON file was {json_file}. Skipped.')
+                logger.info(stdout.strip())
+                logger.info(stderr)
+    return sizes
 
 def write_clonify_input(clonify_db, args):
     seq_dir = os.path.join(args.temp, 'sequences')
@@ -943,7 +949,6 @@ def write_clonify_input(clonify_db, args):
     with open(seq_file, 'wb') as f:
         pickle.dump(list(sequences), f)
     return seq_dir
-     
 
 
 def update_clonify_info(lineage_files, group, args):
@@ -964,7 +969,6 @@ def write_clonify_output(lineage_files, clonify_db, group_id, args):
             seqs = clonify_db.get_sequences_by_id(l.seq_ids)
             fstring = '\n'.join(['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in seqs])
             f.write('#{}\n'.format(l.id) + fstring + '\n\n')
-
 
 
 
