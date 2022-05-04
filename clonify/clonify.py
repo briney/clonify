@@ -272,9 +272,12 @@ def get_sequences(group, args):
             with open(file, 'r') as f:
                 _data = [json.loads(l) for l in f]
                 for d in _data:
-                    j = {'seq_id': d['seq_id'], 'v_gene': {'gene': d['v_gene']['gene'], 'full': d['v_gene']['full']},
-                         'j_gene': {'gene': d['j_gene']['gene'], 'full': d['j_gene']['full']}, 'junc_aa': d['junc_aa'],
-                         'cdr3_nt': d['cdr3_nt'], 'vdj_nt': d['vdj_nt'], 'var_muts_nt': d['var_muts_nt']}
+                    try:
+                        j = {'seq_id': d['seq_id'], 'v_gene': {'gene': d['v_gene']['gene'], 'full': d['v_gene']['full']},
+                             'j_gene': {'gene': d['j_gene']['gene'], 'full': d['j_gene']['full']}, 'junc_aa': d['junc_aa'],
+                             'cdr3_nt': d['cdr3_nt'], 'vdj_nt': d['vdj_nt'], 'var_muts_nt': d['var_muts_nt']}
+                    except KeyError:
+                        logger.info(f"Encountered a sequence with no CDR3: {d['seq_id']}. Skipped.")
                     seqs.append(Sequence(j, seq_key=args.clustering_field))
         return seqs
 
