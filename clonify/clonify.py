@@ -47,6 +47,7 @@ import urllib.request, urllib.parse, urllib.error
 
 import numpy as np
 
+from abutils import io
 from abutils.core.sequence import Sequence
 from abutils.utils import log, mongodb, progbar, seqio
 from abutils.utils.cluster import cluster
@@ -174,11 +175,11 @@ class Args(object):
         split_num=1, pool=False, ip='localhost', port=27017, user=None, password=None,
         output='', temp=None, logfile=None, non_redundant=False, clustering_threshold=0.65, preclustering=True,
         only_productive=False, clustering_memory_allocation=800, clustering_field='vdj_nt', clustering_processes=0,
-        distance_cutoff=0.35, shared_mutation_bonus=0.35, length_penalty=2, clonify_processes=1, 
+        distance_cutoff=0.35, shared_mutation_bonus=0.35, length_penalty=2, clonify_processes=1,
         celery=False, update=True, debug=False):
-        
+
         super(Args, self).__init__()
-        
+
         self.json = json
         self.sequences = sequences
         self.db = db
@@ -263,13 +264,22 @@ def get_sequences(group, args):
                                   user=args.user, password=args.password,
                                   query=query, projection=projection,
                                   seq_field=args.clustering_field, verbose=True)
+        return seqs.as_list
     elif args.json is not None:
-        seqs = seqio.from_json(group,
-                               seq_field=args.clustering_field,
-                               verbose=True)
-    return seqs.as_list
-
-
+        seqs = []
+        for file in group:
+            logger.info(f'Loading {file} ...')
+            with open(file, 'r') as f:
+                _data = [json.loads(l) for l in f]
+                for d in _data:
+                    try:
+                        j = {'seq_id': d['seq_id'], 'v_gene': {'gene': d['v_gene']['gene'], 'full': d['v_gene']['full']},
+                             'j_gene': {'gene': d['j_gene']['gene'], 'full': d['j_gene']['full']}, 'junc_aa': d['junc_aa'],
+                             'cdr3_nt': d['cdr3_nt'], 'vdj_nt': d['vdj_nt'], 'var_muts_nt': d['var_muts_nt']}
+                    except KeyError:
+                        logger.info(f"Encountered a sequence with no CDR3: {d['seq_id']}. Skipped.")
+                    seqs.append(Sequence(j, seq_key=args.clustering_field))
+        return seqs
 
 
 
@@ -417,7 +427,7 @@ def update_json(lineage_files, group, args):
         l = Lineage(lineage_file=lf)
         for seq_id in l.seq_ids:
             ldict[seq_id] = l.id
-            sdict[seq_id] = l.size            
+            sdict[seq_id] = l.size
     # update the JSON files
     # TODO
 
@@ -551,7 +561,7 @@ def update_sequences(lineage_files, args):
         l = Lineage(lineage_file=lf)
         for seq_id in l.seq_ids:
             ldict[seq_id] = l.id
-            sdict[seq_id] = l.size            
+            sdict[seq_id] = l.size
     # update the sequence objects
     for s in args.sequences:
         seq_id = s['seq_id']
@@ -576,23 +586,23 @@ def update_sequences(lineage_files, args):
 
 
 def build_clonify_db(sequences, args):
-    logger.info('')
-    logger.info('Building a SQLite database of Sequence data...')
+#    logger.info('')
+#    logger.info('Building a SQLite database of Sequence data...')
     clonifydb = ClonifyDB('clonify_db', args.temp, clustering_field=args.clustering_field)
     clonifydb.insert(sequences)
     clonifydb.commit()
     logger.info('Indexing...')
-    logger.info('sequence id')
+#    logger.info('sequence id')
     clonifydb.index(fields='id')
-    logger.info('vgene and jgene')
+#    logger.info('vgene and jgene')
     clonifydb.index(fields=['vgene', 'jgene'])
     clonifydb.close()
     return clonifydb
 
 
 def group_by_vj(clonify_db, args):
-    # logger.info('')
-    # logger.info('Grouping sequences by V/J gene use...')
+#    logger.info('')
+#    logger.info('Grouping sequences by V/J gene use...')
     grouping_dir = os.path.join(args.temp, 'vj_groups')
     make_dir(grouping_dir)
     vs = clonify_db.find_distinct('vgene')
@@ -721,9 +731,9 @@ def cluster_vj_groups(groups, clonify_db, args):
 
     Args:
 
-        groups (list): a list of file paths, each corresponding to a single VJ group 
+        groups (list): a list of file paths, each corresponding to a single VJ group
                        (sequences using the same V/J genes)
-        
+
         args (Args): runtime arguments
 
 
@@ -740,6 +750,7 @@ def cluster_vj_groups(groups, clonify_db, args):
     ## Also, we remove the clustering_temp directory upon completion, which shouldn't be done if this
     ## function is going to be parallelized with Celery/multiprocessing
 
+    global ar
     cluster_dir = os.path.join(args.temp, 'vj_clusters')
     make_dir(cluster_dir)
     cluster_temp = os.path.join(args.temp, 'clustering_temp')
@@ -754,16 +765,25 @@ def cluster_vj_groups(groups, clonify_db, args):
         progbar.progress_bar(len(groups), len(groups), start_time=start, extra_info='{}, {}    '.format(v, j))
     # multiprocessing of CD-HIT, one CPU per processes
     else:
+        logger.info('Closing clonify db ...')
         clonify_db.close()
-        processes = mp.cpu_count() if args.clustering_processes == 0 else args.clustering_processes
-        p = mp.Pool(processes, maxtasksperchild=1)
-        async_results = []
-        for group in groups:
-            ar = p.apply_async(cluster_single_vj_group, args=(group, cluster_dir, cluster_temp, clonify_db, args))
-            async_results.append(ar)
-        monitor_mp_jobs(async_results)
-        p.close()
-        p.join()
+        if not args.debug:
+            logger.info('No debug. Clustering vj groups using multiprocessing ...')
+            mp.set_start_method("forkserver")
+            processes = mp.cpu_count() if args.clustering_processes == 0 else args.clustering_processes
+            with mp.Pool(processes, maxtasksperchild=1) as p:
+                async_results = []
+                for group in groups:
+                    ar = p.apply_async(cluster_single_vj_group, args=(group, cluster_dir, cluster_temp, clonify_db, args))
+                async_results.append(ar)
+                monitor_mp_jobs([a for a in async_results])
+                p.close()
+                p.join()
+                p.terminate()
+        else:
+            logger.info('Debug enabled. Clustering vj groups without multiprocessing ...')
+            for group in groups:
+                cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_db, args)
     if not args.debug:
         shutil.rmtree(cluster_temp)
     return cluster_dir
@@ -771,14 +791,16 @@ def cluster_vj_groups(groups, clonify_db, args):
 
 def cluster_single_vj_group(group, cluster_dir, cluster_temp, clonify_db, args):
     v, j = os.path.basename(group).split('_')
-    clusters = cluster(group, threshold=args.clustering_threshold, return_just_seq_ids=True, temp_dir=cluster_temp,
-                        make_db=False, max_memory=args.clustering_memory_allocation, quiet=True, debug=args.debug)
-    for num, id_list in enumerate(clusters):
-        cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, num))
+    _seqs = clonify_db.get_seqs_for_vj_group(v, j, args.clustering_field)
+    if args.debug:
+        logger.info(f'Listed {len(_seqs)} sequences to be clustered from this group ({group}) ...')
+    clusters = cluster(group, threshold=args.clustering_threshold, temp_dir=cluster_temp, debug=args.debug)
+    for c in range(clusters.count):
+        cluster_file = os.path.join(cluster_dir, '{}_{}_{}'.format(v, j, c))
+        id_list = clusters[c].seq_ids
         seqs = clonify_db.get_sequences_by_id(id_list)
         with open(cluster_file, 'wb') as f:
             pickle.dump(seqs, f, protocol=2)
-
 
 #     cluster_dir = os.path.join(args.temp, 'vj_clusters')
 #     make_dir(cluster_dir)
@@ -838,6 +860,7 @@ def run_clonify_singlethreaded(clonify_bin, seq_files, lineage_dir, args):
     start = datetime.now()
     sizes = []
     fcount = len(seq_files)
+    logger.info(f'Running single-threaded clonify on {fcount} files ...')
     for i, seq_file in enumerate(seq_files):
         progbar.progress_bar(i, fcount, start_time=start)
         sizes += run_clonify(clonify_bin, seq_file, lineage_dir, args)
@@ -894,26 +917,32 @@ def run_clonify(clonify_bin, seq_file, lineage_dir, args):
     make_dir(clonify_dir)
     json_file = pretty_json(seqs, as_file=True, temp_dir=clonify_dir)
     cluster_file = json_file + '_cluster'
-    clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
-    p = sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8')
-    stdout, stderr = p.communicate()
-    logger.debug(stdout.strip())
-    logger.debug(stderr)
-    if any(['No Sequence in the input file.' in s for s in [stdout, stderr]]):
-        lineages = []
-    else:
-        lineages = Lineages(seq_ids, cluster_file)
-    sizes = []
-    # lineage_files = []
-    for lineage in lineages:
-        sizes.append(lineage.size)
-        lineage.write(lineage_dir)
-    # clean up
-    if not args.debug:
-        os.unlink(json_file)
-        os.unlink(cluster_file)
-    return sizes
 
+    clonify_cmd = '{} {} {}'.format(clonify_bin, json_file, cluster_file)
+    with sp.Popen(clonify_cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, encoding='utf8') as p:
+        stdout, stderr = p.communicate()
+        logger.debug(stdout.strip())
+        logger.debug(stderr)
+        lineages = []
+        if any(['No Sequence in the input file.' in s for s in [stdout, stderr]]):
+            pass
+        else:
+            try:
+                lineages = Lineages(seq_ids, cluster_file)
+                sizes = []
+                for lineage in lineages:
+                    sizes.append(lineage.size)
+                    lineage.write(lineage_dir)
+                if not args.debug:
+                    os.unlink(json_file)
+                    os.unlink(cluster_file)
+            except:
+                logger.info('\n')
+                logger.info('uhuh. Something went wrong here...')
+                logger.info(f'JSON file was {json_file}. Skipped.')
+                logger.info(stdout.strip())
+                logger.info(stderr)
+    return sizes
 
 def write_clonify_input(clonify_db, args):
     seq_dir = os.path.join(args.temp, 'sequences')
@@ -923,7 +952,6 @@ def write_clonify_input(clonify_db, args):
     with open(seq_file, 'wb') as f:
         pickle.dump(list(sequences), f)
     return seq_dir
-     
 
 
 def update_clonify_info(lineage_files, group, args):
@@ -944,7 +972,6 @@ def write_clonify_output(lineage_files, clonify_db, group_id, args):
             seqs = clonify_db.get_sequences_by_id(l.seq_ids)
             fstring = '\n'.join(['>{}\n{}'.format(s['seq_id'], s['junc_aa']) for s in seqs])
             f.write('#{}\n'.format(l.id) + fstring + '\n\n')
-
 
 
 
@@ -1381,12 +1408,12 @@ def print_clonify_results(seq_count, lineage_sizes):
 
 def get_logfile(args):
     if args.logfile is None:
-    	if args.output is None:
-    		return os.path.abspath('./{}.log'.format(args.db))
-    	else:
-    		return os.path.abspath(os.path.join(args.output, './{}.log'.format(args.db)))
+        if args.output is None:
+            return os.path.abspath('./{}.log'.format(args.db))
+        else:
+            return os.path.abspath(os.path.join(args.output, './{}.log'.format(args.db)))
     else:
-    	return os.path.abspath(args.logfile)
+        return os.path.abspath(args.logfile)
 
 
 def main(args):
@@ -1425,7 +1452,9 @@ def main(args):
             vj_group_files = list_files(vj_group_dir)
             logger.info('Clustering sequences within each VJ group...')
             cluster_dir = cluster_vj_groups(vj_group_files, clonify_db, args)
+            logger.info('Clustering done. Listing cluster files ...')
             cluster_files = list_files(cluster_dir)
+            logger.info(f'Listed {len(cluster_files)} files on which Clonify will run separately ...')
         else:
             logger.info('Clonify is being run without pre-clustering.')
             logger.info('Writing Clonify input...')
