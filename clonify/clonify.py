@@ -251,6 +251,8 @@ def get_input_groups(args):
 
 
 def get_sequences(group, args):
+    logger.info('Creating an empty SQLite database for Sequence data...')
+    clonifydb = ClonifyDB('clonify_db', args.temp, clustering_field=args.clustering_field)
     query = {'chain': 'heavy'}
     if args.only_productive:
         query['prod'] = 'yes'
@@ -266,9 +268,9 @@ def get_sequences(group, args):
                                   seq_field=args.clustering_field, verbose=True)
         return seqs.as_list
     elif args.json is not None:
-        seqs = []
         for file in group:
-            logger.info(f'Loading {file} ...')
+            seqs = []
+            logger.info(f'Loading {file} in memory ...')
             with open(file, 'r') as f:
                 _data = [json.loads(l) for l in f]
                 for d in _data:
@@ -277,9 +279,14 @@ def get_sequences(group, args):
                              'j_gene': {'gene': d['j_gene']['gene'], 'full': d['j_gene']['full']}, 'junc_aa': d['junc_aa'],
                              'cdr3_nt': d['cdr3_nt'], 'vdj_nt': d['vdj_nt'], 'var_muts_nt': d['var_muts_nt']}
                     except KeyError:
-                        logger.info(f"Encountered a sequence with no CDR3: {d['seq_id']}. Skipped.")
+                        if args.debug:
+                            logger.info(f"Encountered a sequence with no CDR3: {d['seq_id']}. Skipped.")
                     seqs.append(Sequence(j, seq_key=args.clustering_field))
-        return seqs
+        logger.info(f'Pushing sequences from {file} into SQLite database ...')
+        clonifydb.insert(seqs)
+        clonifydb.commit()
+
+        return clonifydb
 
 
 
@@ -585,12 +592,12 @@ def update_sequences(lineage_files, args):
 ################################
 
 
-def build_clonify_db(sequences, args):
+def build_clonify_db(clonifydb, args):
 #    logger.info('')
 #    logger.info('Building a SQLite database of Sequence data...')
-    clonifydb = ClonifyDB('clonify_db', args.temp, clustering_field=args.clustering_field)
-    clonifydb.insert(sequences)
-    clonifydb.commit()
+#     clonifydb = ClonifyDB('clonify_db', args.temp, clustering_field=args.clustering_field)
+#     clonifydb.insert(sequences)
+#     clonifydb.commit()
     logger.info('Indexing...')
 #    logger.info('sequence id')
     clonifydb.index(fields='id')
@@ -1436,9 +1443,9 @@ def main(args):
         logger.info('Configuring Clonify...')
         clonify_bin = compile_clonify_binary(args)
         logger.info('Getting sequences...')
-        sequences = get_sequences(group, args)
-        logger.info('Building a SQLite sequence database...')
-        clonify_db = build_clonify_db(sequences, args)
+        clonify_db_raw = get_sequences(group, args)
+        logger.info('Building indexes in SQLite sequence database...')
+        clonify_db = build_clonify_db(clonify_db_raw, args)
         seq_count = clonify_db.count
         logger.info('Retrieved {} sequences'.format(seq_count))
         logger.info('')
