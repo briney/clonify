@@ -282,9 +282,9 @@ def get_sequences(group, args):
                         if args.debug:
                             logger.info(f"Encountered a sequence with no CDR3: {d['seq_id']}. Skipped.")
                     seqs.append(Sequence(j, seq_key=args.clustering_field))
-        logger.info(f'Pushing sequences from {file} into SQLite database ...')
-        clonifydb.insert(seqs)
-        clonifydb.commit()
+            logger.info(f'Pushing sequences from {file} into SQLite database ...')
+            clonifydb.insert(seqs)
+            clonifydb.commit()
 
         return clonifydb
 
